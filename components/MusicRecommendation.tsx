@@ -8,7 +8,7 @@ import { Song } from '@/types/emotion-types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function MusicRecommendationCard() {
-  const { selectedEmotion, selectedContexts, intensity } = useEmotion();
+  const { selectedEmotion } = useEmotion();
   const [songs, setSongs] = useState<Song[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSongs, setSelectedSongs] = useState<string[]>([]);

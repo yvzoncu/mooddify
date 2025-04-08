@@ -8,19 +8,12 @@ import { contextOptions } from '@/types/emotion-types';
 export default function ContextCard() {
   const { selectedContexts, toggleContext } = useEmotion();
 
-  const getSelectedContextLabels = () => {
-    return selectedContexts.map((id) => {
-      const option = contextOptions.find((o) => o.id === id);
-      return option ? option.label : '';
-    });
-  };
-
   return (
     <Card className="w-full max-w-lg shadow-xl m-5 bg-gray-50">
       <CardContent className="space-y-6 p-6">
         <div className="space-y-4 flex flex-col justify-center">
           <h2 className="text-xl font-bold text-gray-900">
-            What's Fueling This Mood? 🧩
+            Whats Fueling This Mood? 🧩
           </h2>
           <p className="text-sm text-gray-500">
             Select 1-3 factors influencing your mood
