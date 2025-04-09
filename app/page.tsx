@@ -3,7 +3,6 @@
 import React from 'react';
 import { EmotionProvider } from '@/contexts/EmotionContext';
 import EmotionCard from '@/components/EmotionCard';
-import Header from '@/components/Header';
 
 export default function Home() {
   const user = {
@@ -19,7 +18,6 @@ export default function Home() {
   return (
     <EmotionProvider>
       <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
-        <Header />
         <EmotionCard user={user} image={imageUrl} />
         <EmotionCard
           user={user}

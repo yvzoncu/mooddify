@@ -43,10 +43,12 @@ export const contextOptions: ContextOption[] = [
 ];
 
 export const intensityPhrases: Record<number, string> = {
-  0: 'Barely there...',
-  33: 'Gentle ripple',
-  66: 'Strong current',
-  100: 'Full tsunami!',
+  0: 'None',
+  10: 'Faint',
+  25: 'Mild',
+  50: 'Moderate',
+  75: 'Intense',
+  100: 'Extreme',
 };
 
 export const generateFlavorTags = (
@@ -55,9 +57,6 @@ export const generateFlavorTags = (
   intensity: number
 ) => {
   const tags = [];
-  const contextLabels = contexts.map(
-    (id) => contextOptions.find((o) => o.id === id)?.label || ''
-  );
 
   // Tags based on emotion
   if (emotion.id === 'joy') {
