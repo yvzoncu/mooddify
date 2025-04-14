@@ -4,13 +4,26 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useEmotion } from '@/contexts/EmotionContext';
 import { intensityPhrases } from '@/types/emotion-types';
-import { Cloud, CloudSun, Sun, Sunset, CloudLightning } from 'lucide-react';
+import {
+  Cloud,
+  CloudSun,
+  Sun,
+  Sunset,
+  CloudLightning,
+  Clock,
+} from 'lucide-react';
 
 export default function IntensityCard() {
   const { intensity, setIntensity, selectedEmotion } = useEmotion();
 
   // Get the appropriate icon based on intensity level
   const IntensityIcon = () => {
+    // If selectedEmotion is null, show a waiting/clock icon
+    if (!selectedEmotion) {
+      return <Clock className="text-gray-400" />;
+    }
+
+    // Otherwise show icons based on intensity with the selected emotion's color
     if (intensity <= 10)
       return <Cloud className={`text-${selectedEmotion.color}-300`} />;
     if (intensity <= 25)
@@ -24,11 +37,30 @@ export default function IntensityCard() {
 
   // Get background color intensity based on slider value
   const getBgColorClass = () => {
+    // If selectedEmotion is null, use a static gray background
+    if (!selectedEmotion) {
+      return 'bg-gray-100';
+    }
+
+    // Otherwise use the selected emotion's color with varying intensities
     if (intensity <= 20) return `bg-${selectedEmotion.color}-50`; // lighter
     if (intensity <= 40) return `bg-${selectedEmotion.color}-100`;
     if (intensity <= 60) return `bg-${selectedEmotion.color}-200`;
     if (intensity <= 80) return `bg-${selectedEmotion.color}-300`;
     return `bg-${selectedEmotion.color}-400`; // darker
+  };
+
+  // Get a background style for the slider
+  const getSliderBackground = () => {
+    if (!selectedEmotion) {
+      // Gray gradient for the null case
+      return 'linear-gradient(to right, #f3f4f6, #9ca3af)';
+    }
+
+    // Use the existing style but interpolated safely
+    return `linear-gradient(to right, 
+      ${selectedEmotion.color}33, 
+      ${selectedEmotion.color}ff)`;
   };
 
   return (
@@ -43,15 +75,16 @@ export default function IntensityCard() {
 
         {/* Intensity Display Card */}
         <div
-          className="p-6 rounded-lg mb-4 flex items-center justify-between transition-all duration-300"
-          style={{ backgroundColor: `var(--${getBgColorClass()})` }}
+          className={`p-6 rounded-lg mb-4 flex items-center justify-between transition-all duration-300 ${getBgColorClass()}`}
         >
           <div className="text-lg font-semibold">
-            {Object.entries(intensityPhrases).reduce(
-              (closest, [key, phrase]) =>
-                intensity >= Number(key) ? phrase : closest,
-              ''
-            )}
+            {!selectedEmotion
+              ? 'Select an emotion first'
+              : Object.entries(intensityPhrases).reduce(
+                  (closest, [key, phrase]) =>
+                    intensity >= Number(key) ? phrase : closest,
+                  ''
+                )}
           </div>
           <div className="text-3xl">
             <IntensityIcon />
@@ -59,7 +92,6 @@ export default function IntensityCard() {
         </div>
 
         {/* Slider Control */}
-
         <input
           type="range"
           min="0"
@@ -68,10 +100,9 @@ export default function IntensityCard() {
           onChange={(e) => setIntensity(Number(e.target.value))}
           className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
           style={{
-            backgroundImage: `linear-gradient(to right, 
-              ${selectedEmotion.color}33, 
-              ${selectedEmotion.color}ff)`,
+            backgroundImage: getSliderBackground(),
           }}
+          disabled={!selectedEmotion}
         />
       </CardContent>
     </Card>

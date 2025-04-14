@@ -3,15 +3,16 @@
 import React, {
   createContext,
   useState,
-  useEffect,
   useContext,
   useMemo,
+  useEffect,
+  ReactNode,
 } from 'react';
-import { Emotion, emotions, generateFlavorTags } from '@/types/emotion-types';
+import { Emotion, generateFlavorTags, Song } from '@/types/emotion-types';
 
 interface EmotionContextType {
-  selectedEmotion: Emotion;
-  setSelectedEmotion: (emotion: Emotion) => void;
+  selectedEmotion: Emotion | null;
+  setSelectedEmotion: (emotion: Emotion | null) => void;
   hoveredEmotion: Emotion | null;
   setHoveredEmotion: (emotion: Emotion | null) => void;
   intensity: number;
@@ -28,29 +29,37 @@ interface EmotionContextType {
   toggleContext: (id: string) => void;
   toggleTag: (tag: string) => void;
   addCustomTag: () => void;
-  showConfetti: () => void;
+  selectedSongs: (string | null | undefined)[];
+  setSelectedSongs: React.Dispatch<
+    React.SetStateAction<(string | null | undefined)[]>
+  >;
 }
 
-export const EmotionContext = createContext<EmotionContextType | undefined>(
-  undefined
-);
+const EmotionContext = createContext<EmotionContextType | undefined>(undefined);
 
-export const EmotionProvider: React.FC<{ children: React.ReactNode }> = ({
+export const EmotionProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [selectedEmotion, setSelectedEmotion] = useState<Emotion>(emotions[0]);
+  const [mounted, setMounted] = useState(false);
+  const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
   const [intensity, setIntensity] = useState<number>(50);
   const [hoveredEmotion, setHoveredEmotion] = useState<Emotion | null>(null);
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [userAddedTags, setUserAddedTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
+  const [selectedSongs, setSelectedSongs] = useState<
+    (string | null | undefined)[]
+  >([]);
 
-  // SSR-safe generation of flavorTags
-  const flavorTags = useMemo(
-    () => generateFlavorTags(selectedEmotion, selectedContexts, intensity),
-    [selectedEmotion, selectedContexts, intensity]
-  );
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const flavorTags = useMemo(() => {
+    if (!selectedEmotion) return [];
+    return generateFlavorTags(selectedEmotion, selectedContexts, intensity);
+  }, [selectedEmotion, selectedContexts, intensity]);
 
   const toggleContext = (id: string) => {
     setSelectedContexts((prev) =>
@@ -62,24 +71,10 @@ export const EmotionProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
-  const showConfetti = () => {
-    if (typeof window !== 'undefined') {
-      import('canvas-confetti').then((confetti) => {
-        confetti.default({
-          particleCount: 20,
-          spread: 40,
-          origin: { y: 0.6 },
-          colors: [selectedEmotion.color],
-        });
-      });
-    }
-  };
-
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
-    if (typeof window !== 'undefined') showConfetti();
   };
 
   const addCustomTag = () => {
@@ -89,6 +84,8 @@ export const EmotionProvider: React.FC<{ children: React.ReactNode }> = ({
       setNewTagInput('');
     }
   };
+
+  if (!mounted) return null;
 
   return (
     <EmotionContext.Provider
@@ -111,7 +108,8 @@ export const EmotionProvider: React.FC<{ children: React.ReactNode }> = ({
         toggleContext,
         toggleTag,
         addCustomTag,
-        showConfetti,
+        selectedSongs, // Add this line
+        setSelectedSongs,
       }}
     >
       {children}
@@ -125,4 +123,17 @@ export const useEmotion = () => {
     throw new Error('useEmotion must be used within an EmotionProvider');
   }
   return context;
+};
+
+export const revealSongsOneByOne = async (
+  newSongs: Song[],
+  setSongs: React.Dispatch<React.SetStateAction<Song[]>>,
+  setButtonText: (text: string) => void
+) => {
+  setSongs([]);
+  for (let i = 0; i < newSongs.length; i++) {
+    await new Promise((res) => setTimeout(res, 300));
+    setSongs((prev) => [...prev, newSongs[i]]);
+  }
+  setButtonText('Get New Recommendations');
 };

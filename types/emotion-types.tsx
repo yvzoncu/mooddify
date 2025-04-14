@@ -20,7 +20,7 @@ export type Song = {
 export const emotions: Emotion[] = [
   { id: 'joy', emoji: '😊', label: 'Joy', color: '#FFE299' }, // Yellow for joy
   { id: 'anger', emoji: '😡', label: 'Anger', color: '#FFAFA3' }, // Red for anger
-  { id: 'sadness', emoji: '😭', label: 'Sadness', color: '#A8DAFF' }, // Blue for sadness
+  { id: 'sadness', emoji: '😭', label: 'Sadness', color: '#A8DAFF' }, // indigo for sadness
   { id: 'excitement', emoji: '🤩', label: 'Excitement', color: '#FFD3A8' }, // Orange-pink for excitement
   { id: 'calm', emoji: '😌', label: 'Calm', color: '#D3BDFF' }, // Light purple for calm
   { id: 'anxiety', emoji: '😖', label: 'Anxiety', color: '#A8EFBD' }, // Green for anxiety
@@ -85,7 +85,7 @@ export const generateFlavorTags = (
   }
 
   if (contexts.includes('weather') && emotion.id === 'joy') {
-    tags.push('#SunnyDisposition', '#BlueSkiesAhead');
+    tags.push('#SunnyDisposition', '#indigoSkiesAhead');
   }
 
   // Some universal tags

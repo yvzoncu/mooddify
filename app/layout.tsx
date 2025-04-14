@@ -1,9 +1,6 @@
 // app/layout.tsx
-
-import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import Header from '@/components/Header';
+import { Geist, Geist_Mono } from 'next/font/google';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -15,7 +12,7 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
+export const metadata = {
   title: 'Moodify',
   description: 'Publish your mood...',
 };
@@ -27,10 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="antialiased">
-        <Header />
-        <main className="pt-20">{children}</main>
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

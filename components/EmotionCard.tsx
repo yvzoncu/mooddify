@@ -70,7 +70,7 @@ export default function EmotionCard({
           <span className="text-2xl">{emotion.emoji}</span>
           <span className="font-medium">{emotion.name}</span>
           <span className="text-gray-400">•</span>
-          <span className="text-blue-500">{emotion.description}</span>
+          <span className="text-indigo-500">{emotion.description}</span>
         </div>
 
         {/* Categories */}
@@ -93,7 +93,7 @@ export default function EmotionCard({
           {tags.map((tag, index) => (
             <span
               key={index}
-              className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm"
+              className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-sm"
             >
               {tag}
             </span>

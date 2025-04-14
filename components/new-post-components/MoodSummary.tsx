@@ -53,7 +53,7 @@ export default function MoodSummaryCard() {
               <Button
                 onClick={generateMoodSummary}
                 disabled={isLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
               >
                 {isLoading ? 'Generating...' : 'Generate Mood Summary'}
               </Button>
@@ -62,7 +62,7 @@ export default function MoodSummaryCard() {
         </div>
 
         {summary && (
-          <div className="p-4 bg-blue-50 text-blue-800 rounded-md text-sm whitespace-pre-wrap">
+          <div className="p-4 bg-indigo-50 text-indigo-800 rounded-md text-sm whitespace-pre-wrap">
             {summary}
           </div>
         )}

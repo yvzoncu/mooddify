@@ -83,7 +83,9 @@ export default function PictureUploadCard() {
 
         <div
           className={`relative w-full h-64 rounded-lg border-2 border-dashed flex flex-col items-center justify-center transition-all duration-300 overflow-hidden
-            ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+            ${
+              dragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300'
+            }`}
           style={
             image ? { borderColor: getBorderColor(), borderStyle: 'solid' } : {}
           }
@@ -100,7 +102,7 @@ export default function PictureUploadCard() {
               </p>
               <button
                 onClick={handleButtonClick}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition flex items-center gap-2"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-600 transition flex items-center gap-2"
               >
                 <Upload size={16} />
                 Browse Files
@@ -137,14 +139,8 @@ export default function PictureUploadCard() {
         </div>
 
         {image && (
-          <div
-            className="p-3 rounded-md bg-white shadow-sm text-center"
-            style={{ backgroundColor: `${selectedEmotion.color}20` }}
-          >
-            <p className="text-sm font-medium">
-              <span className="mr-2">{selectedEmotion.emoji}</span>
-              Your {selectedEmotion.label} moment captured!
-            </p>
+          <div className="p-3 rounded-md bg-white shadow-sm text-center">
+            <p className="text-sm font-medium">Your moment captured!</p>
           </div>
         )}
       </CardContent>

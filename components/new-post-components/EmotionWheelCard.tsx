@@ -67,21 +67,26 @@ export default function EmotionWheelCard() {
             const x = centerX + radius * Math.cos(angle);
             const y = centerY + radius * Math.sin(angle);
 
+            // Check if this emotion is selected (safely handle null selectedEmotion)
+            const isSelected = selectedEmotion
+              ? selectedEmotion.id === emotion.id
+              : false;
+
             return (
               <button
                 key={emotion.id}
                 className={`absolute w-12 h-12 rounded-lg bg-white flex items-center justify-center
                 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl border-2
                 ${
-                  selectedEmotion.id === emotion.id
-                    ? 'scale-125 shadow-xl z-10 border-white ring-2 ring-offset-2 ring-blue-500'
+                  isSelected
+                    ? 'scale-125 shadow-xl z-10 border-white ring-2 ring-offset-2 ring-indigo-500'
                     : 'opacity-90 border-transparent'
                 }`}
                 style={{
                   left: `${x}px`,
                   top: `${y}px`,
                   transform: `translate(-50%, -50%) ${
-                    selectedEmotion.id === emotion.id ? 'scale(1.25)' : ''
+                    isSelected ? 'scale(1.25)' : ''
                   }`,
                 }}
                 onClick={() => setSelectedEmotion(emotion)}
