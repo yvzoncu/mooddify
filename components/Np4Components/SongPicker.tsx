@@ -50,10 +50,6 @@ export default function SongPicker() {
             })
           )
         );
-
-        if (data.query_emotions && Array.isArray(data.query_emotions)) {
-          setQueryEmotions(data.query_emotions);
-        }
       }
     } catch (error) {
       console.error('Error fetching song suggestions:', error);

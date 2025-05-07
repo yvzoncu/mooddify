@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { FaSpotify, FaYoutube } from 'react-icons/fa';
 import { Music2 } from 'lucide-react';
 import { Song } from '@/types/emotion-types';
-import SongTags from '@/components/Np-2-Components/SongTags';
+
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -66,7 +66,7 @@ export default function SongCard({
   song: title,
   artist,
   description,
-  tags,
+
   selected = false,
   onSelect,
 }: Song & { onSelect?: (val: boolean) => void }) {
@@ -112,8 +112,6 @@ export default function SongCard({
         </div>
 
         <p className="text-sm text-gray-700 mb-3">{description}</p>
-
-        <SongTags tags={tags} />
 
         {/* spotify link */}
         {loading ? (
