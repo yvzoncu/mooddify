@@ -30,9 +30,11 @@ export default function MusicRecommendationCard() {
     selectedTags,
     selectedContexts,
     selectedSongs,
-    setSelectedSongs,
+    songs,
+    setSongs,
+    toggleSelection,
   } = useEmotion();
-  const [songs, setSongs] = useState<Song[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,19 +46,42 @@ export default function MusicRecommendationCard() {
     !selectedTags?.length ||
     !selectedContexts?.length;
 
-  const toggleSelection = (id: string | null | undefined) => {
-    if (!id) return;
+  function extractMoodTagsFromReason(reason: string) {
+    const moodKeywords = {
+      Calm: [
+        'calm',
+        'soothing',
+        'relaxed',
+        'peaceful',
+        'mellow',
+        'serene',
+        'gentle',
+      ],
+      Upbeat: [
+        'upbeat',
+        'positive',
+        'energetic',
+        'happy',
+        'joyful',
+        'big energy',
+      ],
+      Social: ['social', 'connect', 'relationship', 'influencing', 'relatable'],
+      Ambient: ['ambient', 'instrumentals', 'atmosphere', 'layers'],
+      Chill: ['chill', 'laid-back', 'smooth', 'vibe'],
+      Emotional: ['emotional', 'sentimental', 'melancholy', 'heartfelt'],
+    };
 
-    setSelectedSongs((prev: (string | null | undefined)[]) => {
-      if (prev.includes(id)) {
-        // If the id is already in the array, remove it
-        return prev.filter((song) => song !== id);
-      } else {
-        // If the id is not in the array, add it
-        return [...prev, id];
+    const tags = new Set();
+    const lowerCaseReason = reason.toLowerCase();
+
+    for (const [tag, keywords] of Object.entries(moodKeywords)) {
+      if (keywords.some((kw) => lowerCaseReason.includes(kw))) {
+        tags.add(tag);
       }
-    });
-  };
+    }
+
+    return Array.from(tags);
+  }
 
   // Function to safely parse JSON with proper error handling
   const safeJsonParse = (jsonString: string): { songs: Song[] } => {
@@ -65,32 +90,27 @@ export default function MusicRecommendationCard() {
     } catch (parseError) {
       console.error('Initial JSON parsing error:', parseError);
 
-      // Try to fix common JSON issues
       try {
-        // Replace invalid escape characters
         const cleanedJson = jsonString
           // Remove control characters
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-          // Fix common invalid escape: song\_name -> song_name
+          // Fix invalid escapes like \_ => _
           .replace(/\\_/g, '_')
           // Escape lone backslashes
           .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
-          // Escape unescaped quotes inside strings
-          .replace(/([^\\])"/g, '$1\\"')
           // Replace newlines and tabs with space
           .replace(/[\n\r\t]/g, ' ')
           .trim();
 
         return JSON.parse(cleanedJson);
       } catch (secondError) {
-        console.error('Failed to fix and parse JSON:', secondError);
+        console.error('Cleaned JSON parse failed:', secondError);
 
-        // Last resort: try to manually extract the song data
+        // Fallback regex-based extraction
         try {
-          // Simple regex-based extraction (this is a fallback)
           const songsData: Song[] = [];
           const songRegex =
-            /"singer"\s*:\s*"([^"]*)"\s*,\s*"song_name"\s*:\s*"([^"]*)"\s*,\s*"reason"\s*:\s*"([^"]*)"/g;
+            /"singer"\s*:\s*"([^"]+?)"\s*,\s*"song[_\\]*name"\s*:\s*"([^"]+?)"\s*,\s*"reason"\s*:\s*"([^"]+?)"/g;
 
           let match;
           while ((match = songRegex.exec(jsonString)) !== null) {
@@ -105,10 +125,10 @@ export default function MusicRecommendationCard() {
             return { songs: songsData };
           }
 
-          throw new Error('Unable to extract song data');
+          throw new Error('Regex match returned no results.');
         } catch (finalError) {
           console.error('All parsing methods failed:', finalError);
-          throw new Error('Could not parse the API response');
+          throw new Error('Could not parse the API response.');
         }
       }
     }
@@ -170,6 +190,7 @@ export default function MusicRecommendationCard() {
 
     try {
       // 1. Create a prompt for Mistral
+
       const prompt = `
 You are a music recommendation AI.
 
@@ -359,7 +380,7 @@ Do not include any markdown, extra text, or formatting outside the JSON block.
       <CardContent className="p-6 space-y-6">
         <div className="space-y-2">
           <h2 className="text-xl font-bold text-gray-900 flex items-center">
-            <span className="mr-2">🎵</span> Find Song For Your Mood
+            <span className="mr-2">🎵</span> Select Songs Represents Your Mood
           </h2>
         </div>
 
@@ -433,42 +454,63 @@ Do not include any markdown, extra text, or formatting outside the JSON block.
         {songs.length > 0 && (
           <div className="mt-4 space-y-3">
             <h3 className="font-semibold">Suggested Tracks:</h3>
-            {songs.map((song, i) => (
-              <motion.div
-                key={`${song.singer}-${song.song_name}-${i}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div
-                  onClick={() => toggleSelection(song.spotify_id)}
-                  className={`cursor-pointer border rounded-lg p-4 bg-white shadow-sm transform transition-all duration-300 hover:scale-105 ${
-                    selectedSongs.includes(song.spotify_id)
-                      ? 'border-indigo-500 ring-2 ring-indigo-200'
-                      : 'border-gray-200'
-                  }`}
+            {songs.map((song, i) => {
+              const enrichedSong = {
+                ...song,
+                mood_tags: extractMoodTagsFromReason(song.reason),
+              };
+
+              return (
+                <motion.div
+                  key={`${song.singer}-${song.song_name}-${i}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <div className="font-medium">
-                    {song.song_name} by {song.singer}
+                  <div
+                    onClick={() => toggleSelection(song)}
+                    className={`cursor-pointer border rounded-lg p-4 bg-white shadow-sm transform transition-all duration-300 hover:scale-105 ${
+                      selectedSongs.includes(song)
+                        ? 'border-indigo-500 ring-2 ring-indigo-200'
+                        : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="font-medium">
+                      {enrichedSong.song_name} by {enrichedSong.singer}
+                    </div>
+
+                    <div className="w-full mt-2">
+                      <iframe
+                        src={`https://open.spotify.com/embed/track/${enrichedSong.spotify_id}?utm_source=generator&theme=0`}
+                        width="100%"
+                        height="80"
+                        frameBorder="0"
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        title={`Spotify: ${enrichedSong.song_name}`}
+                      />
+                    </div>
+
+                    <div className="text-sm text-gray-600 mt-4">
+                      {enrichedSong.reason}
+                    </div>
+                    {enrichedSong.mood_tags?.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {enrichedSong.mood_tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="bg-indigo-50 text-indigo-700 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                          >
+                            {tag as string}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="w-full mt-2">
-                    <iframe
-                      src={`https://open.spotify.com/embed/track/${song.spotify_id}?utm_source=generator&theme=0`}
-                      width="100%"
-                      height="80"
-                      frameBorder="0"
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      allowFullScreen
-                      title={`Spotify: ${song.song_name}`}
-                    />
-                  </div>
-                  <div className="text-sm text-gray-600 mt-2">
-                    {song.reason}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
 
@@ -506,22 +548,34 @@ Do not include any markdown, extra text, or formatting outside the JSON block.
               </span>
             </div>
           ) : (
-            <div className="flex w-full space-x-2">
-              <Input
-                type="text"
-                placeholder="Custom prompt. Ex: 'songs by Taylor Swift'"
-                value={customRequest}
-                onChange={(e) => setCustomRequest(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleCustomRequest()}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleCustomRequest}
-                disabled={customLoading || !customRequest.trim()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
+            <div className="text-center w-full mt-6 space-y-4">
+              {/* Motivational message */}
+              <div className="space-y-2">
+                <div className="text-2xl">🎯</div>
+                <p className="text-gray-700 text-sm font-medium">
+                  Still hunting for the perfect tune? Try custom search use
+                  artist, song name topic etc. to find your perfect track
+                </p>
+              </div>
+
+              {/* Search bar */}
+              <div className="flex w-full space-x-2">
+                <Input
+                  type="text"
+                  placeholder="Custom prompt. Ex: 'songs by Taylor Swift'"
+                  value={customRequest}
+                  onChange={(e) => setCustomRequest(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleCustomRequest()}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleCustomRequest}
+                  disabled={customLoading || !customRequest.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </div>

@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { useEmotion } from '@/contexts/EmotionContext';
 import { Button } from '@/components/ui/button';
 
 export default function MoodSummaryCard() {
-  const { selectedEmotion, selectedContexts, intensity } = useEmotion();
+  const { selectedEmotion, intensity, selectedContexts, selectedSongs } =
+    useEmotion();
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -38,35 +39,49 @@ export default function MoodSummaryCard() {
   };
 
   return (
-    <Card className="w-full max-w-lg shadow-lg m-5 bg-gray-50">
-      <CardContent className="p-6 space-y-6">
-        <div className="space-y-2">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center">
-            <span className="mr-2">🧠</span> Your Mood Summary
-          </h2>
-          <p className="text-sm text-gray-500">
-            A reflection based on your emotion, intensity, context and song(s).
+    <div className="flex flex-col gap-4 mt-20">
+      <div className="space-y-2">
+        <h2 className="text-xl font-bold text-gray-900 flex items-center">
+          5- Your Mood Summary <span className="mr-2">🧠</span>
+        </h2>
+        <p className="text-sm text-gray-500">
+          A reflection based on your emotion, context, tags and song(s).
+        </p>
+
+        {selectedSongs.length === 0 ? (
+          <p className="text-red-600 font-medium mt-4 text-center">
+            Select songs to get your mood summary
           </p>
+        ) : (
+          <>
+            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside mt-4">
+              {selectedSongs.map((song) => (
+                <li key={song.artist}>
+                  {song.song} by <span className="italic">{song.artist}</span>
+                </li>
+              ))}
+            </ul>
 
-          {!summary && (
-            <div className="flex justify-center mt-4">
-              <Button
-                onClick={generateMoodSummary}
-                disabled={isLoading}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                {isLoading ? 'Generating...' : 'Generate Mood Summary'}
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {summary && (
-          <div className="p-4 bg-indigo-50 text-indigo-800 rounded-md text-sm whitespace-pre-wrap">
-            {summary}
-          </div>
+            {!summary && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  onClick={generateMoodSummary}
+                  disabled={isLoading}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  {isLoading ? 'Generating...' : 'Generate Mood Summary'}
+                </Button>
+              </div>
+            )}
+          </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {summary && (
+        <div className="p-4 bg-indigo-50 text-indigo-800 rounded-md text-sm whitespace-pre-wrap">
+          {summary}
+        </div>
+      )}
+    </div>
   );
 }
