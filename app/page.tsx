@@ -1,155 +1,373 @@
-// app/sign-up/page.tsx
-import Link from 'next/link';
-import Image from 'next/image';
+'use client';
 
-export default function SignUpPage() {
+import { useState, useCallback } from 'react';
+import ChatHeader from '@/components/ChatComponents/ChatHeader';
+import ChatInput from '@/components/ChatComponents/UserInput';
+import SongCard from '@/components/ChatComponents/SongCard';
+import { Song } from '@/types/MoodifyTypes';
+import ChatAIMessage from '@/components/ChatComponents/ChatAIMessage';
+import ChatUserMessage from '@/components/ChatComponents/ChatUserMessage';
+import ChatLoadingMesage from '@/components/ChatComponents/ChatLoadingMessage';
+import ChatSong from '@/components/ChatComponents/ChatSong';
+
+interface ConversationItem {
+  type: 'user' | 'ai' | 'loading' | 'song' | 'error';
+  content: string;
+  song?: Song;
+}
+
+interface SongSuggestion {
+  song: string;
+  artist: string;
+  average_top_similarity: number;
+  max_similarity: number;
+  total_top_similarity: number;
+  final_score: number;
+  count: number;
+}
+
+interface ApiResponse {
+  query: string;
+  query_emotions: {
+    label: string;
+    score: number;
+  }[];
+  results: SongSuggestion[];
+  search_type: string;
+}
+
+const API_CONFIG = {
+  MISTRAL_API_KEY: 'RXuqVFz52CqZ61kRjLWtzcMgfdoCNV3z',
+};
+
+export default function MoodPlaylistUI() {
+  const [showRightPanel, setShowRightPanel] = useState(false);
+  const [firstPromptSent, setFirstPromptSent] = useState(false);
+
+  const [inputText, setInputText] = useState('');
+  const [selectedSongs, setSelectedSongs] = useState<Song[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [conversation, setConversation] = useState<ConversationItem[]>([]);
+
+  // Function to fetch song suggestions from the API
+  const fetchSongSuggestions = async (
+    query: string
+  ): Promise<ApiResponse | null> => {
+    try {
+      const response = await fetch(
+        `http://13.48.124.211/api/new-song-suggester?query=${encodeURIComponent(
+          query
+        )}`
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error fetching song suggestions:', errorData);
+        return null;
+      }
+
+      const data = await response.json();
+      return data as ApiResponse;
+    } catch (error) {
+      console.error('Error fetching song suggestions:', error);
+      return null;
+    }
+  };
+
+  const generateResponseToUser = useCallback(
+    async (userInput = '') => {
+      if (!userInput.trim()) return;
+      if (loading) return; // Prevent overlapping requests
+
+      setFirstPromptSent(true);
+      setLoading(true);
+
+      // Step 1: Add user message and placeholder AI message
+      setConversation((prev) => [
+        ...prev,
+        { type: 'user', content: userInput },
+        { type: 'loading', content: '' },
+      ]);
+
+      try {
+        const suggestionsData = await fetchSongSuggestions(userInput);
+        console.log(suggestionsData);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        if (!suggestionsData || !suggestionsData.results?.length) {
+          setConversation((prev) => [
+            ...prev.slice(0, -1), // Remove loading
+            {
+              type: 'error',
+              content:
+                "Sorry, I couldn't find any song suggestions for your mood right now. Please try again with a different description.",
+            },
+          ]);
+          setLoading(false);
+          return;
+        }
+
+        const suggestedSongs = suggestionsData.results
+          .map((song) => `${song.song} by ${song.artist}`)
+          .join(', ');
+
+        const emotions = suggestionsData.query_emotions
+          ? suggestionsData.query_emotions
+              .map((e) => `${e.label} (${(e.score * 100).toFixed(1)}%)`)
+              .join(', ')
+          : 'N/A';
+
+        const prompt = `
+        You are a friendly song analyser AI. 
+        Based on user input you will explain why these songs match their mood or emotional state.
+        User input: ${userInput} 
+        Detected emotions: ${emotions}
+        Suggested songs: ${suggestedSongs}
+        For each song explain why this song is suggested to the user. Use relational explanation between song, artist and user's emotional state.
+        End each song analysis with song name and artist comma separated inside '#' symbol. Like '#Weightless,Marconi Union#'
+        Each analysis cannot be more than 100 words.
+      `;
+
+        // Step 2: Remove 'loading', then add empty 'ai' response
+        setConversation((prev) => [
+          ...prev.slice(0, -1), // Remove 'loading'
+          { type: 'ai', content: '' }, // Placeholder for streaming AI message
+        ]);
+
+        const response = await fetch(
+          'https://api.mistral.ai/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${API_CONFIG.MISTRAL_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'mistral-medium',
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.7,
+              stream: true,
+            }),
+          }
+        );
+
+        if (!response.ok)
+          throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.body) throw new Error('Response body is null');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        let currentResponse = '';
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine.startsWith('data: ')) continue;
+
+            const data = trimmedLine.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+
+              if (content) {
+                currentResponse += content;
+
+                setConversation((prev) => {
+                  const updated = [...prev];
+                  // Update last message if it's an 'ai' message
+                  const lastIndex = updated.length - 1;
+                  if (updated[lastIndex]?.type === 'ai') {
+                    updated[lastIndex] = {
+                      ...updated[lastIndex],
+                      content: currentResponse,
+                    };
+                  }
+                  return updated;
+                });
+              }
+            } catch {
+              console.warn('Invalid JSON chunk. Skipping line.');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error generating response:', error);
+
+        setConversation((prev) => [
+          ...prev.slice(0, -1), // Remove loading or broken AI placeholder
+          {
+            type: 'error',
+            content:
+              'Sorry, I encountered an error while processing your request. Please try again.',
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading]
+  );
+
+  const handleSongClick = (song: Song) => {
+    setShowRightPanel(true);
+    if (!selectedSongs.some((s) => s.spotifyId === song.spotifyId)) {
+      setSelectedSongs([...selectedSongs, song]);
+    }
+  };
+
+  const removeSelectedSong = (songName?: string) => {
+    setSelectedSongs(selectedSongs.filter((song) => song.name !== songName));
+  };
+
+  const handleSongSelect = (song: Song) => {
+    setShowRightPanel(true);
+    setSelectedSongs((prev) =>
+      prev.some((s) => s.name === song.name && s.artist === song.artist)
+        ? prev
+        : [...prev, song]
+    );
+  };
+
   return (
-    <div className="min-h-screen flex">
-      {/* Left side - Form */}
-      <div className="w-1/2 flex items-center justify-center bg-indigo-50 p-8">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Create an account
-            </h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Lets get started. Fill in the details below to create your
-              account.
-            </p>
+    <div className="flex flex-col h-screen bg-black text-white">
+      <ChatHeader />
+      <div className="flex-1 bg-black text-white overflow-hidden">
+        {!showRightPanel ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            {!firstPromptSent ? (
+              <div className="flex flex-col items-center justify-center h-full  w-full max-w-xl">
+                <p className="text-lg font-semibold mb-4">
+                  Find your song based on your mood
+                </p>
+
+                <ChatInput
+                  inputText={inputText}
+                  setInputText={setInputText}
+                  onSend={() => generateResponseToUser(inputText)}
+                  onPlus={() => {}}
+                  onGlobe={() => setShowRightPanel((prev) => !prev)}
+                  loading={loading}
+                  rightPanel={showRightPanel}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="flex-1 p-4 overflow-y-auto w-full max-w-xl">
+                  {conversation.map((msg, index) => (
+                    <div key={index} className="mb-4">
+                      {msg.type === 'user' ? (
+                        <ChatUserMessage content={msg.content} />
+                      ) : msg.type === 'ai' ? (
+                        <ChatAIMessage
+                          content={msg.content}
+                          onSongSelect={handleSongSelect}
+                        />
+                      ) : msg.type === 'song' && msg.song ? (
+                        <ChatSong
+                          song={msg.song}
+                          addSong={() => handleSongClick(msg.song!)}
+                        />
+                      ) : msg.type === 'loading' ? (
+                        <ChatLoadingMesage />
+                      ) : msg.type === 'error' ? (
+                        <ChatAIMessage
+                          content={msg.content}
+                          onSongSelect={() => {}}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+
+                <ChatInput
+                  inputText={inputText}
+                  setInputText={setInputText}
+                  onSend={() => generateResponseToUser(inputText)}
+                  onPlus={() => {}}
+                  onGlobe={() => setShowRightPanel((prev) => !prev)}
+                  loading={loading}
+                  rightPanel={showRightPanel}
+                />
+              </div>
+            )}
           </div>
-
-          <div className="mt-8 space-y-4">
-            {/* Social sign-in options */}
-            <div className="flex flex-col space-y-3">
-              <button className="cursor-pointer w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
-                </svg>
-                Sign in with Google
-              </button>
-
-              <button className="cursor-pointer w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 0C4.477 0 0 4.477 0 10c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0110 4.844c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.933.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C17.14 18.163 20 14.418 20 10c0-5.523-4.477-10-10-10z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Sign in with Apple
-              </button>
-            </div>
-
-            {/* Divider with "OR" */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
+        ) : (
+          <div className="flex w-full h-full">
+            <div className="w-1/2 flex flex-col border-r border-gray-800 items-center overflow-y-auto">
+              <div className="flex-1 p-4 overflow-y-auto w-full max-w-xl">
+                {conversation.map((msg, index) => (
+                  <div key={index} className="mb-4">
+                    {msg.type === 'user' ? (
+                      <ChatUserMessage content={msg.content} />
+                    ) : msg.type === 'ai' ? (
+                      <ChatAIMessage
+                        content={msg.content}
+                        onSongSelect={handleSongSelect}
+                      />
+                    ) : msg.type === 'song' && msg.song ? (
+                      <ChatSong
+                        song={msg.song}
+                        addSong={() => handleSongClick(msg.song!)}
+                      />
+                    ) : msg.type === 'loading' ? (
+                      <ChatLoadingMesage />
+                    ) : msg.type === 'error' ? (
+                      <ChatAIMessage
+                        content={msg.content}
+                        onSongSelect={() => {}}
+                      />
+                    ) : null}
+                  </div>
+                ))}
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">OR</span>
+
+              <ChatInput
+                inputText={inputText}
+                setInputText={setInputText}
+                onSend={() => generateResponseToUser(inputText)}
+                onPlus={() => {}}
+                onGlobe={() => setShowRightPanel((prev) => !prev)}
+                loading={loading}
+                rightPanel={showRightPanel}
+              />
+            </div>
+
+            <div className="w-1/2 bg-gray-900 flex flex-col items-start overflow-y-auto">
+              <div className="p-6 w-full">
+                <h1 className="text-2xl font-bold mb-4">Your Mood Playlist</h1>
+
+                {selectedSongs.map((song, index) => (
+                  <div
+                    onClick={() => removeSelectedSong(song.name)}
+                    key={index}
+                    className={`${
+                      index > 0 ? 'mt-4' : ''
+                    } bg-gray-800 rounded-lg p-4 flex items-start w-full max-w-xl cursor-pointer`}
+                  >
+                    <SongCard
+                      spotifyId={song.spotifyId}
+                      title={song.name}
+                      artist={song.artist}
+                    />
+                  </div>
+                ))}
               </div>
-            </div>
-
-            {/* Email field */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            </div>
-
-            {/* Password field */}
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Minimum 8 characters.
-              </p>
-            </div>
-
-            {/* Terms checkbox */}
-            <div className="flex items-center">
-              <input
-                id="terms"
-                name="terms"
-                type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <label
-                htmlFor="terms"
-                className="ml-2 block text-sm text-gray-700"
-              >
-                I agree to the Terms & Conditions
-              </label>
-            </div>
-
-            {/* Sign up button */}
-            <div>
-              <Link href="/posts">
-                <button className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                  Sign up
-                </button>
-              </Link>
-            </div>
-
-            {/* Sign in link */}
-            <div className="text-center text-sm">
-              <span className="text-gray-600">Already have account?</span>{' '}
-              <Link
-                href="/sign-in"
-                className="font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Sign in
-              </Link>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Right side - Image */}
-      <div className="w-1/2 bg-indigo-50 flex items-center justify-center p-8">
-        <div className="max-w-lg w-full h-full flex items-center">
-          <Image
-            src="https://mood-pictures.s3.eu-north-1.amazonaws.com/moodify_illustration.jpg"
-            alt="Sign up illustration"
-            width={600}
-            height={600}
-            className="object-cover rounded-lg"
-            priority
-          />
-        </div>
+        )}
       </div>
     </div>
   );
