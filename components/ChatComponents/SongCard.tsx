@@ -2,30 +2,22 @@
 
 import React, { useEffect, useState } from 'react';
 
-type SpotifyEmbedProps = {
-  spotifyId?: string;
+type SongProps = {
   title: string;
   artist: string;
 };
 
-const SongCard = ({
-  spotifyId: initialId,
-  title,
-  artist,
-}: SpotifyEmbedProps) => {
-  const [spotifyId, setSpotifyId] = useState<string | undefined>(initialId);
-  const [loading, setLoading] = useState(!initialId);
+const SongCard = ({ title, artist }: SongProps) => {
+  const [spotifyId, setSpotifyId] = useState<string | undefined>();
+  const [loading, setLoading] = useState(!spotifyId);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSpotifyId = async () => {
-      // Only fetch if we don't have an ID but have enough info to search
-      if (!initialId) {
+      if (!spotifyId) {
         try {
           setLoading(true);
           setError(null);
-
-          console.log('Frontend sending:', { title, artist });
 
           // Call your backend API instead of directly accessing Spotify
           const response = await fetch('/api/spotify/search', {
@@ -38,7 +30,6 @@ const SongCard = ({
               artist,
             }),
           });
-          console.log(response);
 
           if (!response.ok) {
             throw new Error('Failed to search for track');
@@ -60,7 +51,7 @@ const SongCard = ({
     };
 
     fetchSpotifyId();
-  }, [initialId, title, artist]);
+  }, [spotifyId, title, artist]);
 
   if (loading) {
     return (

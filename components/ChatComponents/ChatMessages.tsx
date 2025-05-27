@@ -1,12 +1,12 @@
 'use client';
 
 import SongCard from '@/components/ChatComponents/SongCard';
-import { Song } from '@/types/MoodifyTypes';
+import { SongItem } from '@/types/MoodifyTypes';
 
 interface Message {
   type: 'user' | 'ai' | 'song' | 'loading';
   content: string;
-  song?: Song;
+  song?: SongItem;
 }
 
 const LoadingMessage = () => (
@@ -22,11 +22,7 @@ const ChatMessage = ({ msg, addSong }: ChatMessageProps) => {
   if (msg.type === 'song' && msg.song) {
     return (
       <div className="ml-10 max-w-xl p-4 cursor-pointer" onClick={addSong}>
-        <SongCard
-          spotifyId={msg.song.spotifyId}
-          title={msg.song.name}
-          artist={msg.song.artist}
-        />
+        <SongCard title={msg.song.song} artist={msg.song.artist} />
       </div>
     );
   }

@@ -1,13 +1,12 @@
 'use client';
 
-import { Globe, ArrowUp, Loader2 } from 'lucide-react';
+import { ArrowUp, Loader2 } from 'lucide-react';
 
 interface ChatInputProps {
   inputText: string;
   setInputText: (text: string) => void;
   onSend: () => Promise<void>;
   onPlus?: () => void;
-  onGlobe?: () => void;
   loading?: boolean;
   rightPanel: boolean;
 }
@@ -17,7 +16,6 @@ const ChatInput = ({
   setInputText,
   onSend,
   onPlus,
-  onGlobe,
   loading = false,
   rightPanel,
 }: ChatInputProps) => {
@@ -49,14 +47,9 @@ const ChatInput = ({
             onClick={onPlus}
             disabled={loading}
           >
-            <span className="text-xl">+</span>
-          </button>
-          <button
-            className="p-2 rounded-full hover:bg-gray-700"
-            onClick={onGlobe}
-            disabled={loading}
-          >
-            <Globe size={20} />
+            <span className="text-sm text-blue-500 underline cursor-pointer">
+              My playlists
+            </span>
           </button>
         </div>
         <button

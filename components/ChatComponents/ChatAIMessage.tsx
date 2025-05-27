@@ -1,36 +1,25 @@
 import React from 'react';
-import ChatSong from '@/components/ChatComponents/ChatSong';
-import { Song } from '@/types/MoodifyTypes';
+import { SongItem } from '@/types/MoodifyTypes';
 
 interface ChatAIMessageProps {
   content: string;
   avatar?: string;
-  onSongSelect?: (song: Song) => void;
 }
 
 // Helper to parse text into string and Song[] parts
-const extractContentParts = (text: string): (string | Song)[] => {
-  const regex = /#([^#,]+?)\s*,\s*([^#]+?)#/g;
-  const parts: (string | Song)[] = [];
-  let lastIndex = 0;
+const extractContentParts = (text: string): (string | SongItem)[] => {
+  // Updated regex to also capture the song_id at the end (#song_id#)
+  const regex = /#([^#,]+?)\s*,\s*([^#]+?)#\s*#(\d+)#/g;
+  const parts: (string | SongItem)[] = [];
+  const lastIndex = 0;
   let match;
 
   while ((match = regex.exec(text)) !== null) {
-    const [, name, artist] = match;
     const start = match.index;
 
     if (start > lastIndex) {
       parts.push(text.slice(lastIndex, start));
     }
-
-    // Create a valid Song object
-    const song: Song = {
-      name: name.trim(),
-      artist: artist.trim(),
-    };
-
-    parts.push(song);
-    lastIndex = regex.lastIndex;
   }
 
   if (lastIndex < text.length) {
@@ -40,10 +29,7 @@ const extractContentParts = (text: string): (string | Song)[] => {
   return parts;
 };
 
-const ChatAIMessage: React.FC<ChatAIMessageProps> = ({
-  content,
-  onSongSelect,
-}) => {
+const ChatAIMessage: React.FC<ChatAIMessageProps> = ({ content }) => {
   const contentParts = extractContentParts(content);
 
   return (
@@ -52,11 +38,9 @@ const ChatAIMessage: React.FC<ChatAIMessageProps> = ({
         typeof part === 'string' ? (
           <p key={idx}>{part}</p>
         ) : (
-          <ChatSong
-            key={idx}
-            song={part}
-            addSong={() => onSongSelect?.(part)}
-          />
+          <p key={idx}>
+            {part.song} by {part.artist}
+          </p>
         )
       )}
     </div>

@@ -128,3 +128,23 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* styles/scrollbar.css */
+.scrollbar-thin {
+  scrollbar-width: thin; /* Firefox */
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* gray-700 */
+  border-radius: 10px;
+  border: 2px solid transparent;
+}
