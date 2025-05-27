@@ -1,39 +1,30 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  createClientComponentClient,
+  type SupabaseClient,
+} from '@supabase/auth-helpers-nextjs';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '@/utils/supabaseClient';
 
-type AuthContextType = {
+interface AuthContextType {
   user: User | null;
+  supabase: SupabaseClient;
   loading: boolean;
-  signIn: () => Promise<void>;
-  signOut: () => Promise<void>;
-};
+}
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  supabase: createClientComponentClient(),
   loading: true,
-  signIn: async () => {},
-  signOut: async () => {},
 });
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for changes on auth state
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -41,38 +32,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
 
-  const signIn = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error signing in:', error);
-    }
-  };
+  return (
+    <AuthContext.Provider value={{ user, supabase, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
 
-  const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const value = {
-    user,
-    loading,
-    signIn,
-    signOut,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
