@@ -18,7 +18,7 @@ interface PlaylistsResponse {
 
 interface GlobalPlaylistViewProps {
   onClose: () => void;
-  onSelectPlaylist: (playlistId: number, playlistName: string) => void;
+  onSelectPlaylist: (playlistId: number) => void;
 }
 
 const GlobalPlaylistView = ({
@@ -114,7 +114,7 @@ const GlobalPlaylistView = ({
                   key={playlist.id}
                   className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
                   onClick={() => {
-                    onSelectPlaylist(playlist.id, playlist.playlist_name);
+                    onSelectPlaylist(playlist.id);
                     onClose();
                   }}
                 >

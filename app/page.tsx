@@ -531,7 +531,7 @@ export default function MoodPlaylistUI() {
       {showGlobalPlaylist && (
         <GlobalPlaylistView
           onClose={() => setShowGlobalPlaylist(false)}
-          onSelectPlaylist={handlePlaylistView}
+          onSelectPlaylist={(playlistId) => handlePlaylistView(playlistId, '')}
         />
       )}
     </div>
