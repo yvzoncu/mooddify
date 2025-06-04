@@ -4,11 +4,17 @@ export interface SongItem {
   song_id: number;
   song: string;
   artist: string;
+  genre: string;
+  tempo: number;
+  danceability: number;
+  energy: number;
+  acousticness: number;
+  valence: number;
+  song_info: string;
+  distance?: number;
   full_lyric?: string;
   dominants: Array<Record<string, number>>;
   tags: string[];
-  genre: string[];
-
   onSelect?: (selected: boolean) => void;
 }
 

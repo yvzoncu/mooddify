@@ -1,4 +1,12 @@
-import { Search, Bookmark, Plus } from 'lucide-react';
+import {
+  Search,
+  Bookmark,
+  Plus,
+  Activity,
+  Music2,
+  Heart,
+  Volume2,
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import React from 'react';
 import SongCard from '@/components/ChatComponents/SongCard';
@@ -51,21 +59,42 @@ const PlaylistsComponent = ({
     const fetchPlaylists = async () => {
       try {
         setLoading(true);
+        setError(null);
+        console.log('Fetching playlists for user:', userId);
+
         const response = await fetch(
-          `http://13.48.124.211/api/get-user-playlist?user_id=${userId}`
+          `http://56.228.4.188/api/get-user-playlist?user_id=${userId}`,
+          {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+            },
+          }
         );
 
+        console.log('Playlist response status:', response.status);
+
         if (!response.ok) {
-          throw new Error('Failed to fetch playlists');
+          const errorText = await response.text();
+          console.error('Playlist fetch error:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText,
+          });
+          throw new Error(`Failed to fetch playlists: ${response.statusText}`);
         }
 
         const data: PlaylistsResponse = await response.json();
+        console.log('Playlists fetched:', {
+          count: data.playlists?.length || 0,
+        });
+
         setPlaylists(data.playlists || []);
       } catch (err) {
+        console.error('Error fetching playlists:', err);
         setError(
           err instanceof Error ? err.message : 'Failed to load playlists'
         );
-        console.error('Error fetching playlists:', err);
       } finally {
         setLoading(false);
       }
@@ -73,6 +102,9 @@ const PlaylistsComponent = ({
 
     if (userId) {
       fetchPlaylists();
+    } else {
+      setError('No user ID provided');
+      setLoading(false);
     }
   }, [userId]);
 
@@ -173,35 +205,76 @@ const ChatSong: React.FC<ChatSongProps> = ({
   return (
     <>
       <div className="relative w-full max-w-xl p-4 pb-16 bg-gray-800 rounded-lg shadow-md">
-        {/* Tags at the top, under title */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          {(song.tags ?? []).map((chip: string, index: number) => (
-            <span
-              key={index}
-              className="px-2 py-1 text-xs bg-gray-200 text-gray-800 rounded-full"
-            >
-              {chip}
-            </span>
-          ))}
+        {/* Song Info */}
+        <div className="mb-4 text-sm text-gray-300">
+          <p>{song.song_info}</p>
         </div>
+
         <SongCard title={song.song} artist={song.artist} />
 
-        {/* Buttons absolutely positioned at bottom right */}
-        <div className="absolute bottom-2 right-2 flex gap-2">
-          <button
-            onClick={() => {}}
-            title="Find Similar"
-            className="p-2 rounded-full hover:bg-gray-200 hover:text-black text-white transition-colors"
-          >
-            <Search size={20} />
-          </button>
-          <button
-            onClick={handleBookmarkClick}
-            title="Add to Playlist"
-            className="p-2 rounded-full hover:bg-gray-200 transition-colors text-white hover:text-black"
-          >
-            <Bookmark size={20} />
-          </button>
+        {/* Musical Features and Buttons */}
+        <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+          {/* Musical Features */}
+          <div className="flex gap-4 text-xs text-gray-300">
+            <div
+              className="flex items-center gap-1 group relative cursor-help"
+              aria-label="Energy"
+            >
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                Energy Level
+              </div>
+              <Activity size={16} className="text-yellow-400" />
+              <span>{Math.round(song.energy * 100)}%</span>
+            </div>
+            <div
+              className="flex items-center gap-1 group relative cursor-help"
+              aria-label="Acousticness"
+            >
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                Acoustic Elements
+              </div>
+              <Music2 size={16} className="text-blue-400" />
+              <span>{Math.round(song.acousticness * 100)}%</span>
+            </div>
+            <div
+              className="flex items-center gap-1 group relative cursor-help"
+              aria-label="Valence"
+            >
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                Musical Positivity
+              </div>
+              <Heart size={16} className="text-red-400" />
+              <span>{Math.round(song.valence * 100)}%</span>
+            </div>
+            <div
+              className="flex items-center gap-1 group relative cursor-help"
+              aria-label="Danceability"
+            >
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                Dance Rhythm
+              </div>
+              <Volume2 size={16} className="text-green-400" />
+              <span>{Math.round(song.danceability * 100)}%</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {}}
+              title="Find Similar"
+              className="p-2 rounded-full hover:bg-gray-200 hover:text-black text-white transition-colors"
+            >
+              <Search size={20} />
+            </button>
+            <button
+              onClick={handleBookmarkClick}
+              title="Add to Playlist"
+              className="p-2 rounded-full hover:bg-gray-200 transition-colors text-white hover:text-black"
+            >
+              <Bookmark size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
