@@ -1,7 +1,18 @@
 import { SongItem } from './MoodifyTypes';
 
 export interface PlaylistItem {
-  song_id: number;
+  id: number;
+  song: string;
+  artist: string;
+  genre: string;
+  tempo: number;
+  danceability: number;
+  energy: number;
+  valence: number;
+  acousticness: number;
+  release_year: number | null;
+  spotify_id?: string;
+  album_image?: string;
 }
 
 export interface SongDetails {

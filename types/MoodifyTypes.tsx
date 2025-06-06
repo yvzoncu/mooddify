@@ -16,6 +16,8 @@ export interface SongItem {
   dominants: Array<Record<string, number>>;
   tags: string[];
   onSelect?: (selected: boolean) => void;
+  spotify_id?: string;
+  album_image?: string;
 }
 
 export interface ConversationItem {

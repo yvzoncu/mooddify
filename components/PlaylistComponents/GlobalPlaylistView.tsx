@@ -202,8 +202,9 @@ const GlobalPlaylistView = ({
             ) : (
               playlists.map((playlist) => (
                 <div
-                  key={playlist.id}
-                  className="group flex flex-col p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  key={`playlist-${playlist.id}`}
+                  className="p-4 bg-gray-700 rounded-lg"
+                  style={{ backgroundColor: '#374151' }}
                 >
                   <div className="flex items-center justify-between">
                     <div
@@ -213,7 +214,7 @@ const GlobalPlaylistView = ({
                         onClose();
                       }}
                     >
-                      <div className="font-medium">
+                      <div className="font-medium text-white">
                         {playlist.playlist_name}
                       </div>
                       <div className="text-sm text-gray-400">
@@ -224,7 +225,8 @@ const GlobalPlaylistView = ({
                     {onDeletePlaylist && (
                       <button
                         onClick={() => onDeletePlaylist(playlist.id)}
-                        className="p-2 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-2 text-gray-400 hover:text-red-400"
+                        style={{ opacity: 1, display: 'block' }}
                         title="Delete playlist"
                       >
                         <Trash2 size={20} />

@@ -1,12 +1,4 @@
-import {
-  Search,
-  Bookmark,
-  Plus,
-  Activity,
-  Music2,
-  Heart,
-  Volume2,
-} from 'lucide-react';
+import { Bookmark, Plus, Activity, Music2, Heart, Volume2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import React from 'react';
 import SongCard from '@/components/ChatComponents/SongCard';
@@ -210,7 +202,13 @@ const ChatSong: React.FC<ChatSongProps> = ({
           <p>{song.song_info}</p>
         </div>
 
-        <SongCard title={song.song} artist={song.artist} />
+        <SongCard
+          id={song.song_id}
+          song={song.song}
+          artist={song.artist}
+          spotify_id={song.spotify_id}
+          album_image={song.album_image}
+        />
 
         {/* Musical Features and Buttons */}
         <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
@@ -261,18 +259,26 @@ const ChatSong: React.FC<ChatSongProps> = ({
           {/* Action Buttons */}
           <div className="flex gap-2">
             <button
-              onClick={() => {}}
-              title="Find Similar"
-              className="p-2 rounded-full hover:bg-gray-200 hover:text-black text-white transition-colors"
-            >
-              <Search size={20} />
-            </button>
-            <button
               onClick={handleBookmarkClick}
               title="Add to Playlist"
-              className="p-2 rounded-full hover:bg-gray-200 transition-colors text-white hover:text-black"
+              className="cursor-pointer p-1 rounded-full hover:bg-gray-700/30 transition-all duration-300 text-white group relative flex items-center gap-2"
             >
-              <Bookmark size={20} />
+              {/* Helper text */}
+              <span className="text-sm text-purple-400 opacity-80 whitespace-nowrap group-hover:text-purple-300">
+                Add to Playlist
+              </span>
+
+              <div className="relative">
+                {/* Outer ring animation */}
+                <span className="absolute inset-0 rounded-full border-2 border-purple-500 animate-[ping_1.5s_ease-in-out_infinite]"></span>
+                {/* Inner glow effect */}
+                <span className="absolute inset-0 rounded-full bg-purple-500/20 animate-pulse"></span>
+
+                <Bookmark
+                  size={20}
+                  className="transform transition-all duration-300 ease-in-out group-hover:scale-110 group-active:scale-90 group-hover:rotate-6 animate-float hover:animate-none relative z-10"
+                />
+              </div>
             </button>
           </div>
         </div>

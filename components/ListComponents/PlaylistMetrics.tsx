@@ -94,7 +94,6 @@ const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({ songs, title }) => {
           <h3 className="text-sm font-semibold text-gray-300">{title}</h3>
         </div>
         <div className="flex items-center gap-2">
-          <p className="text-xs text-gray-300">{songs.length} songs</p>
           <button
             onClick={() => {
               // TODO: Implement share functionality

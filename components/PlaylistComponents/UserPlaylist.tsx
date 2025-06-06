@@ -51,6 +51,8 @@ interface SongDetails {
   acousticness: number;
   valence: number;
   danceability: number;
+  spotify_id?: string;
+  album_image?: string;
 }
 
 interface SortableItemProps {
@@ -234,7 +236,13 @@ const UserPlaylist = ({
       </div>
 
       <div className="pl-8">
-        <SongCard title={song.song} artist={song.artist} />
+        <SongCard
+          id={song.song_id}
+          song={song.song}
+          artist={song.artist}
+          spotify_id={song.spotify_id}
+          album_image={song.album_image}
+        />
       </div>
 
       {/* Musical Features and Buttons */}
@@ -313,29 +321,32 @@ const UserPlaylist = ({
           />
         </div>
         <div className="max-w-xl w-full pr-4">
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={() => setViewMode('card')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'card'
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}
-              title="Card View"
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}
-              title="List View"
-            >
-              <List size={14} />
-            </button>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-300 pl-4">{items.length} songs</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('card')}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === 'card'
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                }`}
+                title="Card View"
+              >
+                <LayoutGrid size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                }`}
+                title="List View"
+              >
+                <List size={14} />
+              </button>
+            </div>
           </div>
         </div>
         <DndContext

@@ -22,7 +22,13 @@ const ChatMessage = ({ msg, addSong }: ChatMessageProps) => {
   if (msg.type === 'song' && msg.song) {
     return (
       <div className="ml-10 max-w-xl p-4 cursor-pointer" onClick={addSong}>
-        <SongCard title={msg.song.song} artist={msg.song.artist} />
+        <SongCard
+          id={msg.song.song_id}
+          song={msg.song.song}
+          artist={msg.song.artist}
+          spotify_id={msg.song.spotify_id}
+          album_image={msg.song.album_image}
+        />
       </div>
     );
   }

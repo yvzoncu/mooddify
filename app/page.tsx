@@ -232,6 +232,33 @@ export default function MoodPlaylistUI() {
       }
 
       setPlaylistData(data);
+      if (action.toLowerCase() === 'add') {
+        setShowRightPanel(true);
+        const playlist = userPlaylists.find((p) => p.id === playlistId);
+        if (playlist) {
+          setBreadcrumbItems([
+            {
+              label: 'Playlists',
+              onClick: () => {
+                setPlaylistData(null);
+                setBreadcrumbItems([
+                  {
+                    label: 'Playlists',
+                    onClick: () => {},
+                    isActive: true,
+                  },
+                ]);
+              },
+              isActive: false,
+            },
+            {
+              label: playlist.playlist_name,
+              onClick: () => {},
+              isActive: true,
+            },
+          ]);
+        }
+      }
     } catch (error) {
       console.error('Error updating playlist:', error);
       alert('Failed to add song to playlist. Please try again.');
@@ -263,6 +290,10 @@ export default function MoodPlaylistUI() {
 
       const data = await response.json();
       console.log('Playlist data received:', data);
+      console.log(
+        'Playlist items with album images:',
+        data.items?.filter((item: { album_image?: string }) => item.album_image)
+      );
 
       // Initialize empty items array if not present
       if (!data.items) {
@@ -411,7 +442,7 @@ export default function MoodPlaylistUI() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full">
-                <div className="flex-1 p-4 overflow-y-auto w-full max-w-xl scrollbar-thin">
+                <div className="flex-1 p-4 overflow-y-auto w-full max-w-xl  [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black [&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full">
                   {conversation.map((msg, index) => (
                     <div key={index} className="mb-4">
                       {msg.type === 'user' ? (
@@ -514,35 +545,22 @@ export default function MoodPlaylistUI() {
                                 ...playlist,
                                 user_id: user?.id || '',
                               },
-                              items: playlist.playlist_items.map((item) => {
-                                // Find the full song details from the items array
-                                const songDetails = (
-                                  playlistData as PlaylistData | null
-                                )?.items.find(
-                                  (song: SongItem) =>
-                                    song.song_id === item.song_id
-                                );
-
-                                if (!songDetails) {
-                                  // If we can't find the song details, create a minimal song item
-                                  return {
-                                    song_id: item.song_id,
-                                    song: '',
-                                    artist: '',
-                                    genre: '',
-                                    tempo: 0,
-                                    danceability: 0,
-                                    energy: 0,
-                                    valence: 0,
-                                    acousticness: 0,
-                                    song_info: '',
-                                    dominants: [],
-                                    tags: [],
-                                  };
-                                }
-
-                                return songDetails;
-                              }),
+                              items: playlist.playlist_items.map((item) => ({
+                                song_id: item.id,
+                                song: item.song,
+                                artist: item.artist,
+                                genre: item.genre,
+                                tempo: item.tempo,
+                                danceability: item.danceability,
+                                energy: item.energy,
+                                valence: item.valence,
+                                acousticness: item.acousticness,
+                                song_info: '',
+                                dominants: [],
+                                tags: [],
+                                spotify_id: item.spotify_id,
+                                album_image: item.album_image,
+                              })),
                             }}
                             onSelect={handlePlaylistView}
                             onDelete={handleDeletePlaylist}
