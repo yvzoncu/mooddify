@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ChatHeader from '@/components/ChatComponents/ChatHeader';
 import ChatInput from '@/components/ChatComponents/UserInput';
 import {
@@ -19,6 +19,12 @@ import GlobalPlaylistView from '@/components/PlaylistComponents/GlobalPlaylistVi
 import Breadcrumb from '@/components/PlaylistComponents/Breadcrumb';
 import PlaylistCard from '@/components/PlaylistComponents/PlaylistCard';
 import { PlaylistItem } from '@/types/PlaylistTypes';
+import {
+  getTempPlaylist,
+  setTempPlaylist,
+  clearTempPlaylist,
+} from '@/utils/tempPlaylist';
+import { useRouter } from 'next/navigation';
 
 interface PlaylistData {
   message?: string;
@@ -49,6 +55,36 @@ export default function MoodPlaylistUI() {
       playlist_items: PlaylistItem[];
     }>
   >([]);
+  const [tempPlaylist, setTempPlaylistState] = useState<SongItem[]>([]);
+  const router = useRouter();
+
+  // Load temp playlist on mount
+  useEffect(() => {
+    setTempPlaylistState(getTempPlaylist());
+  }, []);
+
+  // When user logs in, check for temp playlist
+  useEffect(() => {
+    if (user && tempPlaylist.length > 0) {
+      if (
+        window.confirm(
+          'You have a temporary playlist. Save it to your account?'
+        )
+      ) {
+        // TODO: Call backend API to save playlist for user
+        // Example: await savePlaylistToBackend(user.id, tempPlaylist);
+        clearTempPlaylist();
+        setTempPlaylistState([]);
+      }
+    }
+  }, [user]);
+
+  // Modified add song handler for temp playlist
+  const handleAddSongToTemp = (song: SongItem) => {
+    const updated = [...tempPlaylist, song];
+    setTempPlaylist(updated);
+    setTempPlaylistState(updated);
+  };
 
   const processSongSuggestions = useCallback(
     async (userInput: string) => {
@@ -439,6 +475,14 @@ export default function MoodPlaylistUI() {
                   loading={loading}
                   rightPanel={showRightPanel}
                 />
+                {!user && tempPlaylist.length > 0 && (
+                  <button
+                    className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-white font-semibold"
+                    onClick={() => router.push('/login')}
+                  >
+                    Login to save playlist
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full">
@@ -452,7 +496,9 @@ export default function MoodPlaylistUI() {
                       ) : msg.type === 'song' && msg.song ? (
                         <ChatSong
                           song={msg.song}
-                          onNewPlaylist={handleNewPlaylist}
+                          onNewPlaylist={
+                            user ? handleNewPlaylist : handleAddSongToTemp
+                          }
                           onSelectPlaylist={handleSelectPlaylist}
                         />
                       ) : msg.type === 'loading' ? (
@@ -488,7 +534,9 @@ export default function MoodPlaylistUI() {
                       ) : msg.type === 'song' && msg.song ? (
                         <ChatSong
                           song={msg.song}
-                          onNewPlaylist={handleNewPlaylist}
+                          onNewPlaylist={
+                            user ? handleNewPlaylist : handleAddSongToTemp
+                          }
                           onSelectPlaylist={handleSelectPlaylist}
                         />
                       ) : msg.type === 'loading' ? (

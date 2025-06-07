@@ -29,6 +29,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UserPlaylistProps {
   playlistData: PlaylistData | null;
@@ -92,6 +93,10 @@ const UserPlaylist = ({
   isLoading,
   onRemoveSongFromPlaylist,
 }: UserPlaylistProps) => {
+  const { user } = useAuth();
+  const userId = user?.id || '';
+  const userName = user?.user_metadata?.full_name || '';
+  const userEmail = user?.email || '';
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [items, setItems] = useState<SongDetails[]>([]);
 
@@ -318,6 +323,10 @@ const UserPlaylist = ({
           <PlaylistMetrics
             songs={items}
             title={playlistData.playlist.playlist_name}
+            playlistId={playlistData.playlist.id}
+            userId={userId}
+            userName={userName}
+            userEmail={userEmail}
           />
         </div>
         <div className="max-w-xl w-full pr-4">

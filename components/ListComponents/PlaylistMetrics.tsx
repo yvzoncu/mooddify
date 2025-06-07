@@ -29,10 +29,22 @@ interface SongMetrics {
 interface PlaylistMetricsProps {
   songs: SongMetrics[];
   title: string;
+  playlistId: number;
+  userId: string;
+  userName: string;
+  userEmail: string;
 }
 
-const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({ songs, title }) => {
+const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({
+  songs,
+  title,
+  playlistId,
+  userId,
+  userName,
+  userEmail,
+}) => {
   const [hiddenMetrics, setHiddenMetrics] = useState<Set<string>>(new Set());
+  const [isSharing, setIsSharing] = useState(false);
 
   const toggleMetric = (metricName: string) => {
     setHiddenMetrics((prev) => {
@@ -83,6 +95,52 @@ const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({ songs, title }) => {
     },
   ];
 
+  const handleShare = async () => {
+    setIsSharing(true);
+    try {
+      let name = userName && userName.trim() ? userName : '';
+      if (!name && userEmail) {
+        name = userEmail.split('@')[0];
+      }
+      const response = await fetch('http://56.228.4.188/api/share-playlist', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playlist_id: playlistId,
+          user_id: userId,
+          user_name: name,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to get share link');
+      const data = await response.json();
+      // Assume API returns { share_url: string }
+      const shareUrl = data.share_url || data.url || data.link || '';
+      if (!shareUrl) throw new Error('No share URL returned');
+
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Check out this playlist!',
+          url: shareUrl,
+        });
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Share link copied to clipboard!');
+      } else {
+        window.prompt('Copy this link to share:', shareUrl);
+      }
+    } catch (err: unknown) {
+      let message = 'Unknown error';
+      if (err instanceof Error) message = err.message;
+      else if (typeof err === 'string') message = err;
+      alert('Failed to share playlist: ' + message);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-xl bg-black rounded-xl shadow-sm border border-black p-4 flex flex-col mb-4">
       {/* Top section - Title left, song count and action buttons right */}
@@ -95,12 +153,10 @@ const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({ songs, title }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              // TODO: Implement share functionality
-              alert('Share functionality coming soon!');
-            }}
-            className="p-1.5 rounded-full hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+            onClick={handleShare}
+            className="p-1.5 rounded-full hover:bg-gray-800 transition-colors text-gray-400 hover:text-white disabled:opacity-50"
             title="Share playlist"
+            disabled={isSharing}
           >
             <Share2 size={16} />
           </button>
