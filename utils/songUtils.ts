@@ -6,20 +6,25 @@ const API_CONFIG = {
 
 export const fetchSongSuggestions = async (
   query: string,
-  user_id: string,
+  user_id: string
 ): Promise<ApiResponse | null> => {
   if (!query.trim()) {
     console.error('Empty query provided to fetchSongSuggestions');
     return null;
   }
 
-  const apiUrl = `http://56.228.4.188/api/new-song-suggester?query=${encodeURIComponent(query)}&user_id=${user_id}&k=5`;
+  const apiUrl = `http://56.228.4.188/api/new-song-suggester?query=${encodeURIComponent(
+    query
+  )}&user_id=${user_id}&k=5`;
   console.log('Making request to:', apiUrl);
-    
+
   try {
     const response = await fetch(apiUrl);
     console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    console.log(
+      'Response headers:',
+      Object.fromEntries(response.headers.entries())
+    );
 
     const responseText = await response.text();
     console.log('Raw response:', responseText);
@@ -35,54 +40,59 @@ export const fetchSongSuggestions = async (
 
       // Handle new API response structure
       if (!data.results || !Array.isArray(data.results)) {
-        console.error('Invalid response structure - missing or invalid results array:', data);
+        console.error(
+          'Invalid response structure - missing or invalid results array:',
+          data
+        );
         return null;
       }
 
       // Transform the response to match expected format
-      const transformedSongs: SongItem[] = data.results.map((song: {
-        song_id: number;
-        song: string;
-        artist: string;
-        genre?: string;
-        tempo?: number;
-        danceability?: number;
-        energy?: number;
-        acousticness?: number;
-        valence?: number;
-        song_info?: string;
-        distance?: number;
-        spotify_id?: string;
-        album_image?: string;
-      }) => ({
-        song_id: song.song_id,
-        song: song.song,
-        artist: song.artist,
-        genre: song.genre || '',
-        tempo: song.tempo || 0,
-        danceability: song.danceability || 0,
-        energy: song.energy || 0,
-        acousticness: song.acousticness || 0,
-        valence: song.valence || 0,
-        song_info: song.song_info || '',
-        distance: song.distance,
-        full_lyric: '',
-        dominants: [], // Default empty array since not provided by new API
-        tags: [], // Default empty array since not provided by new API
-        spotify_id: song.spotify_id,
-        album_image: song.album_image,
-      }));
+      const transformedSongs: SongItem[] = data.results.map(
+        (song: {
+          song_id: number;
+          song: string;
+          artist: string;
+          genre?: string;
+          tempo?: number;
+          danceability?: number;
+          energy?: number;
+          acousticness?: number;
+          valence?: number;
+          song_info?: string;
+          distance?: number;
+          spotify_id?: string;
+          album_image?: string;
+        }) => ({
+          song_id: song.song_id,
+          song: song.song,
+          artist: song.artist,
+          genre: song.genre || '',
+          tempo: song.tempo || 0,
+          danceability: song.danceability || 0,
+          energy: song.energy || 0,
+          acousticness: song.acousticness || 0,
+          valence: song.valence || 0,
+          song_info: song.song_info || '',
+          distance: song.distance,
+          full_lyric: '',
+          dominants: [], // Default empty array since not provided by new API
+          tags: [], // Default empty array since not provided by new API
+          spotify_id: song.spotify_id,
+          album_image: song.album_image,
+        })
+      );
 
       // Create mock emotions data since new API doesn't provide it
       const mockEmotions: Array<Record<string, number>> = [
         { love: 0.7 },
         { happiness: 0.6 },
-        { nostalgia: 0.5 }
+        { nostalgia: 0.5 },
       ];
 
       const transformedResponse: ApiResponse = {
         items: transformedSongs,
-        emotions: mockEmotions
+        emotions: mockEmotions,
       };
 
       console.log('Transformed response:', transformedResponse);
@@ -114,14 +124,15 @@ export const processAllSongs = async (
 
   const songPrompt = `
     You are a friendly song analyser AI with years of experience.
-    Based on user input you will explain why these specific songs match their mood or emotional state.
-    Analyze how these songs work together to help the user's emotional state.
+    Based on user input you will explain why these specific songs match user's emotional state or mood.
     
     User input: ${userInput} 
     Detected emotions: ${detectedEmotions || 'N/A'}
         
     Songs to analyze:
-    ${songs.map((song) => `
+    ${songs
+      .map(
+        (song) => `
     Song ${song.song_id}:
     - Song: ${song.song} by ${song.artist}
     - Genre: ${song.genre}
@@ -140,32 +151,30 @@ export const processAllSongs = async (
       })
       .join(', ')}
     - Song lyric: ${song.full_lyric}
-    `).join('\n')}
+    `
+      )
+      .join('\n')}
           
     First provide a brief overview of how these songs work together to address the user's emotional state.
     Then analyze each song individually, explaining why it was suggested.
-    Keep each song's analysis under 100 words.
-    Start with "Here's how these songs work together:" followed by the overview,
-    then "Let's look at each song:" followed by individual analyses.
+    Keep analysis under 100 words.
+   
     `.trim();
 
   try {
-    const response = await fetch(
-      'https://api.mistral.ai/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${API_CONFIG.MISTRAL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'mistral-medium',
-          messages: [{ role: 'user', content: songPrompt }],
-          temperature: 0.7,
-          stream: true,
-        }),
-      }
-    );
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${API_CONFIG.MISTRAL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'mistral-medium',
+        messages: [{ role: 'user', content: songPrompt }],
+        temperature: 0.7,
+        stream: true,
+      }),
+    });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     if (!response.body) throw new Error('No response body');
@@ -210,8 +219,13 @@ export const processAllSongs = async (
     }
 
     // Remove the loading message and add the final analysis
-    setConversation((prev) => prev.filter((msg) => msg.id !== loadingMessageId));
-    setConversation((prev) => [...prev, { type: 'ai', content: currentResponse }]);
+    setConversation((prev) =>
+      prev.filter((msg) => msg.id !== loadingMessageId)
+    );
+    setConversation((prev) => [
+      ...prev,
+      { type: 'ai', content: currentResponse },
+    ]);
 
     return [currentResponse];
   } catch (error) {
@@ -233,4 +247,4 @@ export const processAllSongs = async (
 
 export const getSelectedSongEmotionsList = (selectedSongs: SongItem[]) => {
   return selectedSongs.map((song) => song.dominants);
-}; 
+};
