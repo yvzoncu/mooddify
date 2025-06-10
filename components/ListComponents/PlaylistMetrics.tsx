@@ -45,6 +45,9 @@ const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({
 }) => {
   const [hiddenMetrics, setHiddenMetrics] = useState<Set<string>>(new Set());
   const [isSharing, setIsSharing] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [ownerNotes, setOwnerNotes] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
 
   const toggleMetric = (metricName: string) => {
     setHiddenMetrics((prev) => {
@@ -112,25 +115,14 @@ const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({
           playlist_id: playlistId,
           user_id: userId,
           user_name: name,
+          owner_notes: ownerNotes,
         }),
       });
       if (!response.ok) throw new Error('Failed to get share link');
       const data = await response.json();
-      // Assume API returns { share_url: string }
-      const shareUrl = data.share_url || data.url || data.link || '';
-      if (!shareUrl) throw new Error('No share URL returned');
-
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Check out this playlist!',
-          url: shareUrl,
-        });
-      } else if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Share link copied to clipboard!');
-      } else {
-        window.prompt('Copy this link to share:', shareUrl);
-      }
+      const url = data.share_url || data.url || data.link || '';
+      if (!url) throw new Error('No share URL returned');
+      setShareUrl(url); // Show the link in the modal
     } catch (err: unknown) {
       let message = 'Unknown error';
       if (err instanceof Error) message = err.message;
@@ -153,7 +145,7 @@ const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleShare}
+            onClick={() => setShowShareModal(true)}
             className="p-1.5 rounded-full hover:bg-gray-800 transition-colors text-gray-400 hover:text-white disabled:opacity-50"
             title="Share playlist"
             disabled={isSharing}
@@ -247,6 +239,102 @@ const PlaylistMetrics: React.FC<PlaylistMetricsProps> = ({
           })}
         </div>
       </TooltipPrimitive.Provider>
+
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 className="text-lg font-bold text-white mb-4">
+              Share Playlist
+            </h2>
+            {shareUrl ? (
+              <div>
+                <div className="mb-4">
+                  <label className="block text-gray-300 mb-2">
+                    Share this link:
+                  </label>
+                  <input
+                    className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 mb-2"
+                    value={shareUrl}
+                    readOnly
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <button
+                    className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 mr-2"
+                    onClick={async () => {
+                      if (
+                        navigator.clipboard &&
+                        navigator.clipboard.writeText
+                      ) {
+                        await navigator.clipboard.writeText(shareUrl);
+                        alert('Link copied!');
+                      } else {
+                        window.prompt('Copy this link:', shareUrl);
+                      }
+                    }}
+                  >
+                    Copy Link
+                  </button>
+                  {navigator.share && (
+                    <button
+                      className="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600"
+                      onClick={async () => {
+                        await navigator.share({
+                          title: 'Check out this playlist!',
+                          url: shareUrl,
+                        });
+                      }}
+                    >
+                      Share
+                    </button>
+                  )}
+                </div>
+                <button
+                  className="px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-600 w-full"
+                  onClick={() => {
+                    setShowShareModal(false);
+                    setOwnerNotes('');
+                    setShareUrl('');
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 mb-4 resize-none"
+                  rows={4}
+                  maxLength={200}
+                  placeholder="Do you want to add a note to your shared playlist? (max 200 chars)"
+                  value={ownerNotes}
+                  onChange={(e) => setOwnerNotes(e.target.value)}
+                  disabled={isSharing}
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-600"
+                    onClick={() => {
+                      setShowShareModal(false);
+                      setOwnerNotes('');
+                      setShareUrl('');
+                    }}
+                    disabled={isSharing}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="px-4 py-2 rounded bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-50"
+                    onClick={handleShare}
+                    disabled={isSharing || ownerNotes.length > 200}
+                  >
+                    {isSharing ? 'Generating link...' : 'Get Link'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

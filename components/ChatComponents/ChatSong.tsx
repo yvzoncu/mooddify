@@ -48,12 +48,14 @@ const PlaylistsComponent = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     const fetchPlaylists = async () => {
       try {
         setLoading(true);
         setError(null);
-        console.log('Fetching playlists for user:', userId);
-
         const response = await fetch(
           `http://56.228.4.188/api/get-user-playlist?user_id=${userId}`,
           {
@@ -63,27 +65,13 @@ const PlaylistsComponent = ({
             },
           }
         );
-
-        console.log('Playlist response status:', response.status);
-
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Playlist fetch error:', {
-            status: response.status,
-            statusText: response.statusText,
-            body: errorText,
-          });
+          // const errorText = await response.text();
           throw new Error(`Failed to fetch playlists: ${response.statusText}`);
         }
-
         const data: PlaylistsResponse = await response.json();
-        console.log('Playlists fetched:', {
-          count: data.playlists?.length || 0,
-        });
-
         setPlaylists(data.playlists || []);
       } catch (err) {
-        console.error('Error fetching playlists:', err);
         setError(
           err instanceof Error ? err.message : 'Failed to load playlists'
         );
@@ -91,13 +79,7 @@ const PlaylistsComponent = ({
         setLoading(false);
       }
     };
-
-    if (userId) {
-      fetchPlaylists();
-    } else {
-      setError('No user ID provided');
-      setLoading(false);
-    }
+    fetchPlaylists();
   }, [userId]);
 
   return (
@@ -115,7 +97,23 @@ const PlaylistsComponent = ({
           transform: 'translate(-50%, -100%)',
         }}
       >
-        {loading ? (
+        {!userId ? (
+          <div className="space-y-1">
+            <div
+              className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer text-green-600 font-medium"
+              onClick={() => {
+                onNewPlaylist(song);
+                onClose();
+              }}
+            >
+              <Plus size={20} />
+              <span>Add to temporary playlist</span>
+            </div>
+            <span className="text-xs text-gray-500">
+              (You need to sign in to save your playlists)
+            </span>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-gray-500">Loading playlists...</div>
           </div>
@@ -135,9 +133,7 @@ const PlaylistsComponent = ({
                 }}
               >
                 <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300 group-hover:border-gray-400">
-                    {/* You can add completion logic here if needed */}
-                  </div>
+                  <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300 group-hover:border-gray-400"></div>
                   <div>
                     <div className="font-medium text-gray-900">
                       {playlist.playlist_name}
@@ -149,7 +145,6 @@ const PlaylistsComponent = ({
                 </div>
               </div>
             ))}
-
             <div
               className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer text-green-600 font-medium"
               onClick={() => {
@@ -178,10 +173,7 @@ const ChatSong: React.FC<ChatSongProps> = ({
   const userId = user?.id || '';
 
   const handleBookmarkClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (!user?.id) {
-      alert('Please sign in to add songs to playlists');
-      return;
-    }
+    // Allow all users to open the playlist modal
     const buttonRect = event.currentTarget.getBoundingClientRect();
     setPlaylistPosition({
       top: buttonRect.top,

@@ -1,17 +1,17 @@
-'use client';
-
 import ChatHeader from '@/components/ChatComponents/ChatHeader';
 import SharedPlaylistClient from '@/app/share/[share_token]/SharedPlaylistClient';
 
-export default function SharedPlaylistPage({
+export default async function SharedPlaylistPage({
   params,
 }: {
-  params: { share_token: string };
+  params: Promise<{ share_token: string }>;
 }) {
+  const { share_token } = await params;
+
   return (
     <>
       <ChatHeader />
-      <SharedPlaylistClient share_token={params.share_token} />
+      <SharedPlaylistClient share_token={share_token} />
     </>
   );
 }

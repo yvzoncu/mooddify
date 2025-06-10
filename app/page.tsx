@@ -63,6 +63,144 @@ export default function MoodPlaylistUI() {
     setTempPlaylistState(getTempPlaylist());
   }, []);
 
+  // Function to auto-display temp playlist
+  const handleDisplayTempPlaylist = useCallback(() => {
+    if (tempPlaylist.length === 0) return;
+
+    setShowRightPanel(true);
+    setBreadcrumbItems([
+      { label: 'Temporary Playlist', onClick: () => {}, isActive: true },
+    ]);
+
+    setPlaylistData({
+      playlist: {
+        id: 0,
+        user_id: 'temp',
+        playlist_name: 'Temporary Playlist',
+        playlist_items: tempPlaylist.map((song) => ({
+          id: song.song_id,
+          song: song.song,
+          artist: song.artist,
+          genre: song.genre || '',
+          tempo: song.tempo || 0,
+          danceability: song.danceability || 0,
+          energy: song.energy || 0,
+          valence: song.valence || 0,
+          acousticness: song.acousticness || 0,
+          release_year: null,
+        })),
+      },
+      items: tempPlaylist,
+    });
+
+    // Clean up URL parameter
+    router.replace('/', { scroll: false });
+  }, [tempPlaylist, router]);
+
+  // Function to auto-display user playlist
+  const handleAutoDisplayPlaylist = useCallback(
+    async (playlistId: number) => {
+      try {
+        console.log('Auto-displaying playlist:', playlistId);
+        setPlaylistLoading(true);
+
+        // Fetch the playlist directly
+        const response = await fetch(
+          `http://56.228.4.188/api/get-playlist-by-playlist-id?id=${playlistId}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch playlist');
+        }
+
+        const data = await response.json();
+        console.log('Auto-display playlist data:', data);
+
+        // Initialize empty items array if not present
+        if (!data.items) {
+          data.items = [];
+        }
+
+        // Ensure items is always an array
+        if (!Array.isArray(data.items)) {
+          data.items = [];
+        }
+
+        // Set the playlist data and show sidebar
+        setPlaylistData(data);
+        setShowRightPanel(true);
+        setBreadcrumbItems([
+          {
+            label: 'Playlists',
+            onClick: () => {
+              setPlaylistData(null);
+              setShowRightPanel(false);
+            },
+            isActive: false,
+          },
+          {
+            label: data.playlist?.playlist_name || 'Playlist',
+            onClick: () => {},
+            isActive: true,
+          },
+        ]);
+
+        console.log('Auto-display completed successfully');
+
+        // Clean up URL parameter
+        router.replace('/', { scroll: false });
+      } catch (error) {
+        console.error('Error auto-displaying playlist:', error);
+        // Clean up URL parameter even on error
+        router.replace('/', { scroll: false });
+      } finally {
+        setPlaylistLoading(false);
+      }
+    },
+    [
+      router,
+      setPlaylistData,
+      setShowRightPanel,
+      setBreadcrumbItems,
+      setPlaylistLoading,
+    ]
+  );
+
+  // Handle URL parameters to auto-display playlists
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const showTempPlaylist = urlParams.get('showTempPlaylist');
+    const showPlaylistId = urlParams.get('showPlaylist');
+
+    console.log('URL parameter check:', {
+      showTempPlaylist,
+      showPlaylistId,
+      tempPlaylistLength: tempPlaylist.length,
+      userExists: !!user,
+    });
+
+    if (showTempPlaylist === 'true' && tempPlaylist.length > 0) {
+      // Auto-display temp playlist
+      console.log('Auto-displaying temp playlist');
+      handleDisplayTempPlaylist();
+    } else if (showPlaylistId && user) {
+      // Auto-display user playlist
+      const playlistId = parseInt(showPlaylistId);
+      console.log('Auto-displaying user playlist:', playlistId);
+      if (!isNaN(playlistId)) {
+        // Fetch and display the specific playlist
+        handleAutoDisplayPlaylist(playlistId);
+      }
+    }
+  }, [
+    tempPlaylist,
+    user,
+    handleDisplayTempPlaylist,
+    handleAutoDisplayPlaylist,
+  ]);
+
   // When user logs in, check for temp playlist
   useEffect(() => {
     if (user && tempPlaylist.length > 0) {
@@ -77,13 +215,74 @@ export default function MoodPlaylistUI() {
         setTempPlaylistState([]);
       }
     }
-  }, [user]);
+  }, [user, tempPlaylist.length]);
 
   // Modified add song handler for temp playlist
   const handleAddSongToTemp = (song: SongItem) => {
+    if (tempPlaylist.some((s) => s.song_id === song.song_id)) return; // Prevent duplicate
     const updated = [...tempPlaylist, song];
     setTempPlaylist(updated);
     setTempPlaylistState(updated);
+    // Show sidebar and set breadcrumb for temp playlist
+    setShowRightPanel(true);
+    setBreadcrumbItems([
+      {
+        label: 'Playlists',
+        onClick: () => setShowRightPanel(false),
+        isActive: false,
+      },
+      { label: 'Temporary Playlist', onClick: () => {}, isActive: true },
+    ]);
+    // Set playlistData to a mock object for UserPlaylist
+    setPlaylistData({
+      playlist: {
+        id: 0,
+        user_id: 'temp',
+        playlist_name: 'Temporary Playlist',
+        playlist_items: updated.map((song) => ({
+          id: song.song_id,
+          song: song.song,
+          artist: song.artist,
+          genre: song.genre || '',
+          tempo: song.tempo || 0,
+          danceability: song.danceability || 0,
+          energy: song.energy || 0,
+          valence: song.valence || 0,
+          acousticness: song.acousticness || 0,
+          release_year: null,
+        })),
+      },
+      items: updated,
+    });
+  };
+
+  // Handle removing a song from temp playlist
+  const handleRemoveSongFromTempPlaylist = (
+    playlistId: number,
+    songId: number,
+    action: string
+  ) => {
+    if (playlistId === 0) {
+      const updated = tempPlaylist.filter((song) => song.song_id !== songId);
+      setTempPlaylist(updated);
+      setTempPlaylistState(updated);
+      setPlaylistData((prev) =>
+        prev
+          ? {
+              ...prev,
+              playlist: {
+                ...prev.playlist,
+                playlist_items: prev.playlist.playlist_items.filter(
+                  (item: PlaylistItem) => item.id !== songId
+                ),
+              },
+              items: updated,
+            }
+          : prev
+      );
+    } else {
+      handleSelectPlaylist(playlistId, songId, action);
+    }
   };
 
   const processSongSuggestions = useCallback(
@@ -217,8 +416,11 @@ export default function MoodPlaylistUI() {
             setBreadcrumbItems([
               {
                 label: 'Playlists',
-                onClick: () => {},
-                isActive: true,
+                onClick: () => {
+                  setPlaylistData(null);
+                  setShowRightPanel(false);
+                },
+                isActive: false,
               },
             ]);
           },
@@ -280,8 +482,11 @@ export default function MoodPlaylistUI() {
                 setBreadcrumbItems([
                   {
                     label: 'Playlists',
-                    onClick: () => {},
-                    isActive: true,
+                    onClick: () => {
+                      setPlaylistData(null);
+                      setShowRightPanel(false);
+                    },
+                    isActive: false,
                   },
                 ]);
               },
@@ -351,8 +556,11 @@ export default function MoodPlaylistUI() {
             setBreadcrumbItems([
               {
                 label: 'Playlists',
-                onClick: () => {},
-                isActive: true,
+                onClick: () => {
+                  setPlaylistData(null);
+                  setShowRightPanel(false);
+                },
+                isActive: false,
               },
             ]);
           },
@@ -372,8 +580,11 @@ export default function MoodPlaylistUI() {
       setBreadcrumbItems([
         {
           label: 'Playlists',
-          onClick: () => {},
-          isActive: true,
+          onClick: () => {
+            setPlaylistData(null);
+            setShowRightPanel(false);
+          },
+          isActive: false,
         },
       ]);
     } finally {
@@ -383,7 +594,31 @@ export default function MoodPlaylistUI() {
 
   const fetchUserPlaylists = async () => {
     if (!user) {
-      alert('Please sign in to view your playlists');
+      // Show temp playlist in sidebar for anonymous users
+      setShowRightPanel(true);
+      setBreadcrumbItems([
+        { label: 'Temporary Playlist', onClick: () => {}, isActive: true },
+      ]);
+      setPlaylistData({
+        playlist: {
+          id: 0,
+          user_id: 'temp',
+          playlist_name: 'Temporary Playlist',
+          playlist_items: tempPlaylist.map((song) => ({
+            id: song.song_id,
+            song: song.song,
+            artist: song.artist,
+            genre: song.genre || '',
+            tempo: song.tempo || 0,
+            danceability: song.danceability || 0,
+            energy: song.energy || 0,
+            valence: song.valence || 0,
+            acousticness: song.acousticness || 0,
+            release_year: null,
+          })),
+        },
+        items: tempPlaylist,
+      });
       return;
     }
 
@@ -403,8 +638,11 @@ export default function MoodPlaylistUI() {
       setBreadcrumbItems([
         {
           label: 'Playlists',
-          onClick: () => {},
-          isActive: true,
+          onClick: () => {
+            setPlaylistData(null);
+            setShowRightPanel(false);
+          },
+          isActive: false,
         },
       ]);
       setShowRightPanel(true);
@@ -443,8 +681,11 @@ export default function MoodPlaylistUI() {
         setBreadcrumbItems([
           {
             label: 'Playlists',
-            onClick: () => {},
-            isActive: true,
+            onClick: () => {
+              setPlaylistData(null);
+              setShowRightPanel(false);
+            },
+            isActive: false,
           },
         ]);
       }
@@ -576,7 +817,9 @@ export default function MoodPlaylistUI() {
                     <UserPlaylist
                       playlistData={playlistData}
                       isLoading={false}
-                      onRemoveSongFromPlaylist={handleSelectPlaylist}
+                      onRemoveSongFromPlaylist={
+                        handleRemoveSongFromTempPlaylist
+                      }
                     />
                   ) : (
                     <div className="space-y-4 mt-4">
@@ -660,8 +903,11 @@ export default function MoodPlaylistUI() {
                           setBreadcrumbItems([
                             {
                               label: 'Playlists',
-                              onClick: () => {},
-                              isActive: true,
+                              onClick: () => {
+                                setPlaylistData(null);
+                                setShowRightPanel(false);
+                              },
+                              isActive: false,
                             },
                           ]);
                         },
