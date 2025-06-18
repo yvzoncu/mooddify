@@ -42,6 +42,8 @@ export interface PlaylistData {
     user_id: string;
     playlist_name: string;
     playlist_items: PlaylistItem[];
+    identifier: number;
+    playlist_analysis: string;
   };
   items: SongItem[];
-} 
+}

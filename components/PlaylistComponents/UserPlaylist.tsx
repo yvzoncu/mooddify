@@ -10,6 +10,10 @@ import {
   LayoutGrid,
   List,
   GripVertical,
+  Share2,
+  Sparkles,
+  BringToFront,
+  X,
 } from 'lucide-react';
 import PlaylistMetrics from '@/components/ListComponents/PlaylistMetrics';
 import {
@@ -30,6 +34,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/contexts/AuthContext';
+import Image from 'next/image';
 
 interface UserPlaylistProps {
   playlistData: PlaylistData | null;
@@ -43,7 +48,7 @@ interface UserPlaylistProps {
 
 type ViewMode = 'card' | 'list';
 
-interface SongDetails {
+interface PlaylistItem {
   song_id: number;
   song: string;
   artist: string;
@@ -52,6 +57,20 @@ interface SongDetails {
   acousticness: number;
   valence: number;
   danceability: number;
+  spotify_id?: string;
+  album_image?: string;
+}
+
+interface RawPlaylistItem {
+  song_id?: number;
+  id?: number;
+  song?: string;
+  artist?: string;
+  song_info?: string;
+  energy?: number;
+  acousticness?: number;
+  valence?: number;
+  danceability?: number;
   spotify_id?: string;
   album_image?: string;
 }
@@ -98,7 +117,18 @@ const UserPlaylist = ({
   const userName = user?.user_metadata?.full_name || '';
   const userEmail = user?.email || '';
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [items, setItems] = useState<SongDetails[]>([]);
+  const [items, setItems] = useState<PlaylistItem[]>([]);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [playlistAnalysis, setPlaylistAnalysis] = useState<string>('');
+  const [identifier, setIdentifier] = useState<number>(0);
+  const [showAnalysis, setShowAnalysis] = useState(true);
+  const [localPlaylistItems, setLocalPlaylistItems] = useState<
+    { song_id: number }[]
+  >([]);
+  const [djAnalysis, setDjAnalysis] = useState<string>('');
+  const [showDjAnalysis, setShowDjAnalysis] = useState(false);
+  const [isDjAnalyzing, setIsDjAnalyzing] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -107,33 +137,373 @@ const UserPlaylist = ({
     })
   );
 
-  // Initialize items when playlistData changes
+  // Initialize items and playlist analysis when playlistData changes
   useEffect(() => {
     if (playlistData?.items) {
-      setItems(playlistData.items);
+      // Transform items to ensure all required fields are present
+      const transformedItems = playlistData.items
+        .map(
+          (item: RawPlaylistItem): PlaylistItem => ({
+            song_id: item.song_id ?? item.id ?? 0,
+            song: item.song ?? '',
+            artist: item.artist ?? '',
+            song_info: item.song_info,
+            energy: item.energy ?? 0,
+            acousticness: item.acousticness ?? 0,
+            valence: item.valence ?? 0,
+            danceability: item.danceability ?? 0,
+            spotify_id: item.spotify_id,
+            album_image: item.album_image,
+          })
+        )
+        .filter((item) => item.song_id !== 0);
+
+      setItems(transformedItems);
+
+      console.log('Debug - Items loaded:', {
+        originalItems: playlistData.items.length,
+        transformedItems: transformedItems.length,
+        itemIds: transformedItems.map((item) => item.song_id),
+        playlistItems: playlistData.playlist?.playlist_items?.length || 0,
+        playlistItemIds:
+          playlistData.playlist?.playlist_items?.map((item) => item.id) || [],
+      });
+    }
+
+    // Initialize playlist analysis
+    if (playlistData?.playlist.playlist_analysis) {
+      setPlaylistAnalysis(playlistData.playlist.playlist_analysis);
+    }
+
+    // Initialize identifier
+    if (playlistData?.playlist.identifier) {
+      setIdentifier(playlistData.playlist.identifier);
+    }
+
+    // Initialize local playlist items
+    if (playlistData?.playlist.playlist_items) {
+      setLocalPlaylistItems(
+        playlistData.playlist.playlist_items.map(
+          (item: { song_id?: number; id?: number }) => ({
+            song_id: item.song_id ?? item.id ?? 0,
+          })
+        )
+      );
     }
   }, [playlistData]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      const oldIndex = items.findIndex(
-        (item) => item.song_id.toString() === active.id
+    if (
+      !active ||
+      !over ||
+      active.id === over.id ||
+      !playlistData?.playlist?.id
+    ) {
+      return;
+    }
+
+    const oldIndex = items.findIndex(
+      (item) => item.song_id.toString() === active.id
+    );
+    const newIndex = items.findIndex(
+      (item) => item.song_id.toString() === over.id
+    );
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      // Capture the song_id BEFORE updating the state
+      const songIdToMove = items[oldIndex].song_id;
+      const targetSongId = items[newIndex].song_id;
+
+      // Calculate server-side indices based on current playlist_items
+      const currentPlaylistItems =
+        localPlaylistItems.length > 0
+          ? localPlaylistItems
+          : (playlistData.playlist.playlist_items || []).map(
+              (item: { song_id?: number; id?: number }) => ({
+                song_id: item.song_id ?? item.id ?? 0,
+              })
+            );
+      const serverOldIndex = currentPlaylistItems.findIndex(
+        (item) => item.song_id === songIdToMove
       );
-      const newIndex = items.findIndex(
-        (item) => item.song_id.toString() === over.id
+      const serverNewIndex = currentPlaylistItems.findIndex(
+        (item) => item.song_id === targetSongId
       );
 
-      // Log the reorder request (replace with API call later)
-      console.log('Reorder request:', {
-        playlistId: playlistData?.playlist.id,
-        oldIndex,
-        newIndex,
-        songId: active.id,
+      console.log('Debug - Drag and drop details:', {
+        activeId: active.id,
+        overId: over.id,
+        frontendOldIndex: oldIndex,
+        frontendNewIndex: newIndex,
+        serverOldIndex,
+        serverNewIndex,
+        songIdToMove,
+        targetSongId,
+        playlistItems: currentPlaylistItems.map((item) => item.song_id),
+        frontendItems: items.map((item) => item.song_id),
+        playlistId: playlistData.playlist.id,
       });
 
-      setItems((items) => arrayMove(items, oldIndex, newIndex));
+      // Validate server indices
+      if (serverOldIndex === -1 || serverNewIndex === -1) {
+        console.error('Could not find song indices in playlist_items');
+        alert('Error: Song not found in playlist structure');
+        return;
+      }
+
+      // Update local state immediately for better UX
+      const newItems = arrayMove(items, oldIndex, newIndex);
+      setItems(newItems);
+
+      // Save to database using server indices
+      try {
+        const requestBody = {
+          playlist_id: playlistData.playlist.id,
+          song_id: songIdToMove,
+          old_index: serverOldIndex,
+          new_index: serverNewIndex,
+        };
+
+        console.log('API Request Body:', requestBody);
+
+        const response = await fetch(
+          `http://56.228.4.188/api/reorder-playlist-items`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to save playlist order');
+        }
+
+        const data = await response.json();
+        console.log('Playlist order saved successfully:', data.message);
+
+        // Update the playlist data with the response from the server
+        if (data.items && Array.isArray(data.items)) {
+          // Transform the server response to match our local state format
+          const transformedItems = data.items.map(
+            (item: {
+              id: number;
+              song: string;
+              artist: string;
+              song_info?: string;
+              energy?: number;
+              acousticness?: number;
+              valence?: number;
+              danceability?: number;
+              spotify_id?: string;
+              album_image?: string;
+            }) => ({
+              song_id: item.id,
+              song: item.song,
+              artist: item.artist,
+              song_info: item.song_info,
+              energy: item.energy || 0,
+              acousticness: item.acousticness || 0,
+              valence: item.valence || 0,
+              danceability: item.danceability || 0,
+              spotify_id: item.spotify_id,
+              album_image: item.album_image,
+            })
+          );
+          setItems(transformedItems);
+        }
+
+        // Update local playlist_items to match server state
+        if (data.playlist?.playlist_items) {
+          setLocalPlaylistItems(
+            data.playlist.playlist_items.map(
+              (item: { song_id?: number; id?: number }) => ({
+                song_id: item.song_id ?? item.id ?? 0,
+              })
+            )
+          );
+          console.log(
+            'Local playlist_items updated:',
+            data.playlist.playlist_items
+          );
+        }
+
+        // Update identifier if provided
+        if (data.playlist?.identifier !== undefined) {
+          setIdentifier(data.playlist.identifier);
+        }
+      } catch (error) {
+        console.error('Error saving playlist order:', error);
+        // Revert the local state if API call fails
+        setItems(items);
+        alert('Failed to save playlist order. Please try again.');
+      }
+    }
+  };
+
+  const handleShare = async () => {
+    setIsSharing(true);
+    try {
+      let name = userName && userName.trim() ? userName : '';
+      if (!name && userEmail) {
+        name = userEmail.split('@')[0];
+      }
+      const response = await fetch('http://56.228.4.188/api/share-playlist', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playlist_id: playlistData?.playlist.id,
+          user_id: userId,
+          user_name: name,
+          owner_notes: playlistAnalysis,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to get share link');
+      const data = await response.json();
+      const url = data.share_url || data.url || data.link || '';
+      if (!url) throw new Error('No share URL returned');
+
+      // Try to use the Web Share API first
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: playlistData?.playlist.playlist_name || 'Shared Playlist',
+            text: 'Check out this playlist!',
+            url: url,
+          });
+          return; // Exit if Web Share API succeeded
+        } catch {
+          // If user cancelled or share failed, fall through to clipboard
+          console.log('Web Share API failed, falling back to clipboard');
+        }
+      }
+
+      // Try to use the Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(url);
+          alert('Share link copied to clipboard!');
+          return; // Exit if clipboard write succeeded
+        } catch {
+          console.log('Clipboard API failed, falling back to fallback method');
+        }
+      }
+
+      // Fallback method: Create a temporary input element
+      const tempInput = document.createElement('input');
+      tempInput.style.position = 'absolute';
+      tempInput.style.left = '-9999px';
+      tempInput.value = url;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      try {
+        document.execCommand('copy');
+        alert('Share link copied to clipboard!');
+      } catch {
+        alert('Unable to copy automatically. Your share link is: ' + url);
+      } finally {
+        document.body.removeChild(tempInput);
+      }
+    } catch (err: unknown) {
+      let message = 'Unknown error';
+      if (err instanceof Error) message = err.message;
+      else if (typeof err === 'string') message = err;
+      alert('Failed to share playlist: ' + message);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleAIAnalysis = async () => {
+    if (!playlistData?.playlist.id) return;
+
+    if (identifier === items.length) {
+      setShowAnalysis(!showAnalysis);
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch(
+        `http://56.228.4.188/api/playlist-analysis?playlist_id=${playlistData.playlist.id}`,
+        {
+          method: 'GET',
+          headers: {
+            accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to get playlist analysis: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.analysis) {
+        setPlaylistAnalysis(data.analysis);
+      } else {
+        throw new Error('No analysis data received');
+      }
+      if (data.identifier) {
+        setIdentifier(data.identifier);
+      } else {
+        throw new Error('No identifier data received');
+      }
+    } catch (error) {
+      console.error('Error fetching playlist analysis:', error);
+      alert('Failed to get AI analysis. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAIOrderSuggestion = async () => {
+    if (djAnalysis) {
+      setShowDjAnalysis(!showDjAnalysis);
+      return;
+    }
+
+    setShowDjAnalysis(false);
+    setIsDjAnalyzing(true);
+
+    try {
+      const response = await fetch(
+        `http://56.228.4.188/api/dj-playlist-order?playlist_id=${playlistData?.playlist.id}`,
+        {
+          method: 'GET',
+          headers: {
+            accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to get DJ order suggestion: ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (data.dj_analysis) {
+        setDjAnalysis(data.dj_analysis);
+        setShowDjAnalysis(true);
+      } else {
+        throw new Error('No DJ analysis data received');
+      }
+    } catch (error) {
+      console.error('Error fetching DJ order suggestion:', error);
+      alert('Failed to get DJ order suggestion. Please try again.');
+    } finally {
+      setIsDjAnalyzing(false);
     }
   };
 
@@ -163,7 +533,7 @@ const UserPlaylist = ({
   }
 
   const renderListView = (
-    song: SongDetails,
+    song: PlaylistItem,
     listeners: ReturnType<typeof useSortable>['listeners'],
     attributes: ReturnType<typeof useSortable>['attributes']
   ) => (
@@ -176,9 +546,15 @@ const UserPlaylist = ({
         <GripVertical size={14} className="text-gray-400" />
       </button>
       <div className="flex items-center gap-4 flex-1 pl-8">
-        <span className="text-gray-500 w-8 text-center">
-          {items.findIndex((item) => item.song_id === song.song_id) + 1}
-        </span>
+        <div className="w-10 h-10 relative rounded-md overflow-hidden flex-shrink-0">
+          <Image
+            src={song.album_image || '/images/default-album.png'}
+            alt={`${song.song} album art`}
+            fill
+            className="object-cover"
+            sizes="40px"
+          />
+        </div>
         <div>
           <p className="text-gray-200 font-medium">{song.song}</p>
           <p className="text-gray-400 text-sm">{song.artist}</p>
@@ -223,7 +599,7 @@ const UserPlaylist = ({
   );
 
   const renderCardView = (
-    song: SongDetails,
+    song: PlaylistItem,
     listeners: ReturnType<typeof useSortable>['listeners'],
     attributes: ReturnType<typeof useSortable>['attributes']
   ) => (
@@ -320,19 +696,68 @@ const UserPlaylist = ({
     <div>
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <PlaylistMetrics
-            songs={items}
-            title={playlistData.playlist.playlist_name}
-            playlistId={playlistData.playlist.id}
-            userId={userId}
-            userName={userName}
-            userEmail={userEmail}
-          />
+          <PlaylistMetrics songs={items} />
         </div>
         <div className="max-w-xl w-full pr-4">
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-300 pl-4">{items.length} songs</p>
             <div className="flex gap-2">
+              {/* add a button for getting playlist order suggestions from ai */}
+              <button
+                onClick={handleAIOrderSuggestion}
+                className={`p-2 rounded-lg transition-colors group ${
+                  identifier === items.length && showDjAnalysis
+                    ? 'bg-gray-700'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                }`}
+                title="Get DJ order suggestion"
+              >
+                <BringToFront
+                  size={14}
+                  className="transform transition-all duration-300 ease-in-out group-hover:scale-110 group-active:scale-90 group-hover:rotate-6 relative z-10"
+                />
+              </button>
+              <button
+                onClick={handleAIAnalysis}
+                className={`p-2 rounded-lg transition-colors group ${
+                  identifier === items.length && showAnalysis
+                    ? 'bg-gray-700'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                }`}
+                title="AI Analysis"
+                style={{ pointerEvents: isAnalyzing ? 'none' : 'auto' }}
+              >
+                {identifier === items.length ? (
+                  <Sparkles
+                    size={14}
+                    className="transform transition-all duration-300 ease-in-out group-hover:scale-110 group-active:scale-90 group-hover:rotate-6 relative z-10"
+                  />
+                ) : (
+                  <div className="relative">
+                    {/* Outer ring animation */}
+                    <span className="absolute inset-0 rounded-full border-2 border-purple-500 animate-[ping_1.5s_ease-in-out_infinite]"></span>
+                    {/* Inner glow effect */}
+                    <span className="absolute inset-0 rounded-full bg-purple-500/20 animate-pulse"></span>
+
+                    <Sparkles
+                      size={14}
+                      className="transform transition-all duration-300 ease-in-out group-hover:scale-110 group-active:scale-90 group-hover:rotate-6 animate-float hover:animate-none relative z-10"
+                    />
+                  </div>
+                )}
+              </button>
+              <button
+                onClick={handleShare}
+                className={`p-2 rounded-lg transition-colors ${
+                  isSharing
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                }`}
+                title="Share Playlist"
+                disabled={isSharing}
+              >
+                <Share2 size={14} />
+              </button>
               <button
                 onClick={() => setViewMode('card')}
                 className={`p-2 rounded-lg transition-colors ${
@@ -358,6 +783,51 @@ const UserPlaylist = ({
             </div>
           </div>
         </div>
+        {isAnalyzing && (
+          <div className="mt-2 px-4 py-2 bg-gray-800 text-gray-200 rounded text-sm max-w-xl w-full flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-500 border-t-transparent"></div>
+            <span>Generating AI analysis...</span>
+          </div>
+        )}
+        {isDjAnalyzing && (
+          <div className="mt-2 px-4 py-2 bg-gray-800 text-gray-200 rounded text-sm max-w-xl w-full flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+            <span>Getting DJ order suggestion...</span>
+          </div>
+        )}
+        {playlistAnalysis && !isAnalyzing && showAnalysis && (
+          <div className="mt-2 px-4 py-2 bg-gray-800 text-gray-200 rounded text-sm max-w-xl w-full relative">
+            {identifier !== items.length && (
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm rounded flex items-center justify-center z-10">
+                <div className="text-center">
+                  <p className="text-yellow-400 font-medium">
+                    Playlist changed
+                  </p>
+                  <p className="text-gray-300 text-xs">Update analysis</p>
+                </div>
+              </div>
+            )}
+            <div className={identifier !== items.length ? 'blur-sm' : ''}>
+              {playlistAnalysis}
+            </div>
+          </div>
+        )}
+        {djAnalysis && !isDjAnalyzing && showDjAnalysis && (
+          <div className="mt-2 px-4 py-2 bg-gray-900 text-gray-200 rounded text-sm max-w-xl w-full relative border border-blue-500/30">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-blue-400 text-xs font-medium">
+                DJ Order Suggestion
+              </span>
+              <button
+                onClick={() => setShowDjAnalysis(false)}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="text-gray-200">{djAnalysis}</div>
+          </div>
+        )}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

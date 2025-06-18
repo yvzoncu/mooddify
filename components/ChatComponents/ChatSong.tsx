@@ -1,4 +1,12 @@
-import { Bookmark, Plus, Activity, Music2, Heart, Volume2 } from 'lucide-react';
+import {
+  Bookmark,
+  Plus,
+  Activity,
+  Music2,
+  Heart,
+  Volume2,
+  Music,
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import React from 'react';
 import SongCard from '@/components/ChatComponents/SongCard';
@@ -133,7 +141,6 @@ const PlaylistsComponent = ({
                 }}
               >
                 <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300 group-hover:border-gray-400"></div>
                   <div>
                     <div className="font-medium text-gray-900">
                       {playlist.playlist_name}
@@ -171,6 +178,7 @@ const ChatSong: React.FC<ChatSongProps> = ({
   const [playlistPosition, setPlaylistPosition] = useState({ top: 0, left: 0 });
   const { user } = useAuth();
   const userId = user?.id || '';
+  const [showFullInfo, setShowFullInfo] = useState(false);
 
   const handleBookmarkClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     // Allow all users to open the playlist modal
@@ -191,7 +199,75 @@ const ChatSong: React.FC<ChatSongProps> = ({
       <div className="relative w-full max-w-xl p-4 pb-16 bg-gray-800 rounded-lg shadow-md">
         {/* Song Info */}
         <div className="mb-4 text-sm text-gray-300">
-          <p>{song.song_info}</p>
+          {song.song_info ? (
+            <div>
+              <div className="flex items-center gap-2 mb-3 text-gray-200">
+                <Music size={16} className="flex-shrink-0 text-blue-400" />
+                <p className="truncate">
+                  <span className="font-medium">{song.song}</span>
+                  <span className="mx-1">by</span>
+                  <span className="text-gray-400">{song.artist}</span>
+                </p>
+              </div>
+              {/* Musical Features */}
+              <div className="flex gap-4 text-xs text-gray-300 mb-2">
+                <div
+                  className="flex items-center gap-1 group relative cursor-help"
+                  aria-label="Energy"
+                >
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    Energy Level
+                  </div>
+                  <Activity size={16} className="text-yellow-400" />
+                  <span>{Math.round(song.energy * 100)}%</span>
+                </div>
+                <div
+                  className="flex items-center gap-1 group relative cursor-help"
+                  aria-label="Acousticness"
+                >
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    Acoustic Elements
+                  </div>
+                  <Music2 size={16} className="text-blue-400" />
+                  <span>{Math.round(song.acousticness * 100)}%</span>
+                </div>
+                <div
+                  className="flex items-center gap-1 group relative cursor-help"
+                  aria-label="Valence"
+                >
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    Musical Positivity
+                  </div>
+                  <Heart size={16} className="text-red-400" />
+                  <span>{Math.round(song.valence * 100)}%</span>
+                </div>
+                <div
+                  className="flex items-center gap-1 group relative cursor-help"
+                  aria-label="Danceability"
+                >
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    Dance Rhythm
+                  </div>
+                  <Volume2 size={16} className="text-green-400" />
+                  <span>{Math.round(song.danceability * 100)}%</span>
+                </div>
+              </div>
+              <p>
+                {showFullInfo
+                  ? song.song_info
+                  : song.song_info.slice(0, 200) +
+                    (song.song_info.length > 200 ? '...' : '')}
+              </p>
+              {song.song_info.length > 200 && (
+                <button
+                  className="mt-2 text-xs text-blue-400 hover:underline focus:outline-none"
+                  onClick={() => setShowFullInfo(!showFullInfo)}
+                >
+                  {showFullInfo ? 'Show less' : 'Show more'}
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <SongCard
@@ -203,53 +279,9 @@ const ChatSong: React.FC<ChatSongProps> = ({
         />
 
         {/* Musical Features and Buttons */}
-        <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-          {/* Musical Features */}
-          <div className="flex gap-4 text-xs text-gray-300">
-            <div
-              className="flex items-center gap-1 group relative cursor-help"
-              aria-label="Energy"
-            >
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                Energy Level
-              </div>
-              <Activity size={16} className="text-yellow-400" />
-              <span>{Math.round(song.energy * 100)}%</span>
-            </div>
-            <div
-              className="flex items-center gap-1 group relative cursor-help"
-              aria-label="Acousticness"
-            >
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                Acoustic Elements
-              </div>
-              <Music2 size={16} className="text-blue-400" />
-              <span>{Math.round(song.acousticness * 100)}%</span>
-            </div>
-            <div
-              className="flex items-center gap-1 group relative cursor-help"
-              aria-label="Valence"
-            >
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                Musical Positivity
-              </div>
-              <Heart size={16} className="text-red-400" />
-              <span>{Math.round(song.valence * 100)}%</span>
-            </div>
-            <div
-              className="flex items-center gap-1 group relative cursor-help"
-              aria-label="Danceability"
-            >
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                Dance Rhythm
-              </div>
-              <Volume2 size={16} className="text-green-400" />
-              <span>{Math.round(song.danceability * 100)}%</span>
-            </div>
-          </div>
-
+        <div className="absolute bottom-2 left-2 right-2 flex justify-end">
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2">
             <button
               onClick={handleBookmarkClick}
               title="Add to Playlist"

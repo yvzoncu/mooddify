@@ -4,6 +4,21 @@ const API_CONFIG = {
   MISTRAL_API_KEY: 'RXuqVFz52CqZ61kRjLWtzcMgfdoCNV3z',
 };
 
+const DEFAULT_SONG_VALUES = {
+  genre: '',
+  tempo: 0,
+  danceability: 0,
+  energy: 0,
+  acousticness: 0,
+  valence: 0,
+  song_info: '',
+  full_lyric: '',
+  dominants: [],
+  tags: [],
+  spotify_id: '',
+  album_image: '/images/default-album.png',
+};
+
 export const fetchSongSuggestions = async (
   query: string,
   user_id: string
@@ -15,97 +30,98 @@ export const fetchSongSuggestions = async (
 
   const apiUrl = `http://56.228.4.188/api/new-song-suggester?query=${encodeURIComponent(
     query
-  )}&user_id=${user_id}&k=5`;
-  console.log('Making request to:', apiUrl);
+  )}&user_id=${user_id}&k=50`;
 
   try {
     const response = await fetch(apiUrl);
-    console.log('Response status:', response.status);
-    console.log(
-      'Response headers:',
-      Object.fromEntries(response.headers.entries())
-    );
-
-    const responseText = await response.text();
-    console.log('Raw response:', responseText);
 
     if (!response.ok) {
-      console.error(`Error response (${response.status}):`, responseText);
-      return null;
+      const errorText = await response.text();
+      console.error(`API Error (${response.status}):`, errorText);
+      throw new Error(`API request failed with status ${response.status}`);
     }
 
-    try {
-      const data = JSON.parse(responseText);
-      console.log('Parsed response:', data);
+    const data = await response.json();
 
-      // Handle new API response structure
-      if (!data.results || !Array.isArray(data.results)) {
-        console.error(
-          'Invalid response structure - missing or invalid results array:',
-          data
-        );
-        return null;
-      }
-
-      // Transform the response to match expected format
-      const transformedSongs: SongItem[] = data.results.map(
-        (song: {
-          song_id: number;
-          song: string;
-          artist: string;
-          genre?: string;
-          tempo?: number;
-          danceability?: number;
-          energy?: number;
-          acousticness?: number;
-          valence?: number;
-          song_info?: string;
-          distance?: number;
-          spotify_id?: string;
-          album_image?: string;
-        }) => ({
-          song_id: song.song_id,
-          song: song.song,
-          artist: song.artist,
-          genre: song.genre || '',
-          tempo: song.tempo || 0,
-          danceability: song.danceability || 0,
-          energy: song.energy || 0,
-          acousticness: song.acousticness || 0,
-          valence: song.valence || 0,
-          song_info: song.song_info || '',
-          distance: song.distance,
-          full_lyric: '',
-          dominants: [], // Default empty array since not provided by new API
-          tags: [], // Default empty array since not provided by new API
-          spotify_id: song.spotify_id,
-          album_image: song.album_image,
-        })
+    // Validate response structure
+    if (!data.results || !Array.isArray(data.results)) {
+      throw new Error(
+        'Invalid API response structure: missing or invalid results array'
       );
-
-      // Create mock emotions data since new API doesn't provide it
-      const mockEmotions: Array<Record<string, number>> = [
-        { love: 0.7 },
-        { happiness: 0.6 },
-        { nostalgia: 0.5 },
-      ];
-
-      const transformedResponse: ApiResponse = {
-        items: transformedSongs,
-        emotions: mockEmotions,
-      };
-
-      console.log('Transformed response:', transformedResponse);
-      return transformedResponse;
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Failed to parse response text:', responseText);
-      return null;
     }
+
+    // Transform the response to match expected format
+    const transformedSongs: SongItem[] = data.results.map(
+      (song: Partial<SongItem>) => ({
+        song_id: song.song_id ?? 0,
+        song: song.song ?? 'Unknown Song',
+        artist: song.artist ?? 'Unknown Artist',
+        ...DEFAULT_SONG_VALUES,
+        ...song,
+        // Ensure arrays are always arrays even if they come as null/undefined
+        dominants: Array.isArray(song.dominants) ? song.dominants : [],
+        tags: Array.isArray(song.tags) ? song.tags : [],
+        // Ensure numbers are valid numbers
+        tempo: typeof song.tempo === 'number' ? song.tempo : 0,
+        danceability:
+          typeof song.danceability === 'number' ? song.danceability : 0,
+        energy: typeof song.energy === 'number' ? song.energy : 0,
+        acousticness:
+          typeof song.acousticness === 'number' ? song.acousticness : 0,
+        valence: typeof song.valence === 'number' ? song.valence : 0,
+        // Ensure strings are valid strings
+        genre: typeof song.genre === 'string' ? song.genre : '',
+        song_info: typeof song.song_info === 'string' ? song.song_info : '',
+        spotify_id: typeof song.spotify_id === 'string' ? song.spotify_id : '',
+        album_image:
+          typeof song.album_image === 'string' && song.album_image
+            ? song.album_image
+            : DEFAULT_SONG_VALUES.album_image,
+      })
+    );
+
+    // Generate emotions based on the average musical features of the songs
+    const emotions = generateEmotionsFromSongs(transformedSongs);
+
+    return {
+      items: transformedSongs,
+      emotions,
+    };
   } catch (error) {
-    console.error('Network error fetching song suggestions:', error);
+    console.error('Error in fetchSongSuggestions:', error);
     return null;
   }
+};
+
+// Helper function to generate emotions based on song features
+const generateEmotionsFromSongs = (
+  songs: SongItem[]
+): Array<Record<string, number>> => {
+  if (songs.length === 0) return [];
+
+  // Calculate average musical features
+  const avgFeatures = songs.reduce(
+    (acc, song) => ({
+      energy: acc.energy + song.energy,
+      valence: acc.valence + song.valence,
+      danceability: acc.danceability + song.danceability,
+    }),
+    { energy: 0, valence: 0, danceability: 0 }
+  );
+
+  const count = songs.length;
+  const normalizedFeatures = {
+    energy: avgFeatures.energy / count,
+    valence: avgFeatures.valence / count,
+    danceability: avgFeatures.danceability / count,
+  };
+
+  // Map features to emotions
+  return [
+    { happiness: normalizedFeatures.valence },
+    { energy: normalizedFeatures.energy },
+    { groove: normalizedFeatures.danceability },
+  ];
 };
 
 export const processAllSongs = async (

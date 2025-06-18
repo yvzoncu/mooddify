@@ -12,7 +12,7 @@ import ChatAIMessage from '@/components/ChatComponents/ChatAIMessage';
 import ChatUserMessage from '@/components/ChatComponents/ChatUserMessage';
 import ChatLoadingMesage from '@/components/ChatComponents/ChatLoadingMessage';
 import ChatSong from '@/components/ChatComponents/ChatSong';
-import { fetchSongSuggestions, processAllSongs } from '@/utils/songUtils';
+import { fetchSongSuggestions } from '@/utils/songUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import UserPlaylist from '@/components/PlaylistComponents/UserPlaylist';
 import GlobalPlaylistView from '@/components/PlaylistComponents/GlobalPlaylistView';
@@ -33,6 +33,8 @@ interface PlaylistData {
     user_id: string;
     playlist_name: string;
     playlist_items: PlaylistItem[];
+    identifier: number;
+    playlist_analysis: string;
   };
   items: SongItem[];
 }
@@ -56,6 +58,8 @@ export default function MoodPlaylistUI() {
     }>
   >([]);
   const [tempPlaylist, setTempPlaylistState] = useState<SongItem[]>([]);
+  const [allSuggestedSongs, setAllSuggestedSongs] = useState<SongItem[]>([]);
+  const [shownSongCount, setShownSongCount] = useState(0);
   const router = useRouter();
 
   // Load temp playlist on mount
@@ -89,6 +93,8 @@ export default function MoodPlaylistUI() {
           acousticness: song.acousticness || 0,
           release_year: null,
         })),
+        identifier: 0,
+        playlist_analysis: '',
       },
       items: tempPlaylist,
     });
@@ -251,6 +257,8 @@ export default function MoodPlaylistUI() {
           acousticness: song.acousticness || 0,
           release_year: null,
         })),
+        identifier: 0,
+        playlist_analysis: '',
       },
       items: updated,
     });
@@ -288,7 +296,6 @@ export default function MoodPlaylistUI() {
   const processSongSuggestions = useCallback(
     async (userInput: string) => {
       if (!userInput.trim() || loading) return;
-
       setFirstPromptSent(true);
       setLoading(true);
       setConversation((prev) => [
@@ -296,17 +303,12 @@ export default function MoodPlaylistUI() {
         { type: 'user', content: userInput },
         { type: 'loading', content: '' },
       ]);
-
       try {
-        console.log('Fetching suggestions for:', userInput);
         const apiResponse = await fetchSongSuggestions(
           userInput,
           user?.id || 'None'
         );
-        console.log('API Response:', apiResponse);
-
         if (!apiResponse || !apiResponse.items?.length) {
-          console.log('No suggestions found');
           setConversation((prev) => [
             ...prev.slice(0, -1),
             {
@@ -316,28 +318,12 @@ export default function MoodPlaylistUI() {
           ]);
           return;
         }
-
-        const detectedEmotions = apiResponse.emotions
-          .map((e) => {
-            const name = Object.keys(e)[0];
-            const val = e[name];
-            return `${name} (${(val * 100).toFixed(1)}%)`;
-          })
-          .join(', ');
-
-        console.log('Detected emotions:', detectedEmotions);
         setConversation((prev) => prev.slice(0, -1));
-
-        // First process the AI analysis
-        await processAllSongs(
-          apiResponse.items,
-          userInput,
-          detectedEmotions,
-          setConversation
-        );
-
-        // Then add each song to the conversation
-        apiResponse.items.forEach((song) => {
+        setAllSuggestedSongs(apiResponse.items);
+        setShownSongCount(0);
+        // Add first 3 songs
+        const firstBatch = apiResponse.items.slice(0, 3);
+        for (const song of firstBatch) {
           setConversation((prev) => [
             ...prev,
             {
@@ -346,9 +332,20 @@ export default function MoodPlaylistUI() {
               content: `${song.song} by ${song.artist}`,
             },
           ]);
-        });
-      } catch (error) {
-        console.error('Suggestion error:', error);
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+        setShownSongCount(firstBatch.length);
+        if (apiResponse.items.length > 3) {
+          setConversation((prev) => [
+            ...prev,
+            {
+              type: 'action',
+              content: 'Load More Songs',
+              action: 'load-more',
+            },
+          ]);
+        }
+      } catch {
         setConversation((prev) => [
           ...prev.slice(0, -1),
           {
@@ -362,6 +359,38 @@ export default function MoodPlaylistUI() {
     },
     [loading, user?.id]
   );
+
+  const handleLoadMoreSongs = async () => {
+    // Remove the action item
+    setConversation((prev) => prev.filter((item) => item.type !== 'action'));
+    const nextBatch = allSuggestedSongs.slice(
+      shownSongCount,
+      shownSongCount + 3
+    );
+    for (const song of nextBatch) {
+      setConversation((prev) => [
+        ...prev,
+        {
+          type: 'song',
+          song: song,
+          content: `${song.song} by ${song.artist}`,
+        },
+      ]);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    const newShownCount = shownSongCount + nextBatch.length;
+    setShownSongCount(newShownCount);
+    if (newShownCount < allSuggestedSongs.length) {
+      setConversation((prev) => [
+        ...prev,
+        {
+          type: 'action',
+          content: 'Load More Songs',
+          action: 'load-more',
+        },
+      ]);
+    }
+  };
 
   const generateResponseToUser = useCallback(
     async (userInput: string = '') => {
@@ -411,18 +440,8 @@ export default function MoodPlaylistUI() {
       setBreadcrumbItems([
         {
           label: 'Playlists',
-          onClick: () => {
-            setPlaylistData(null);
-            setBreadcrumbItems([
-              {
-                label: 'Playlists',
-                onClick: () => {
-                  setPlaylistData(null);
-                  setShowRightPanel(false);
-                },
-                isActive: false,
-              },
-            ]);
+          onClick: async () => {
+            await fetchUserPlaylists();
           },
           isActive: false,
         },
@@ -477,18 +496,8 @@ export default function MoodPlaylistUI() {
           setBreadcrumbItems([
             {
               label: 'Playlists',
-              onClick: () => {
-                setPlaylistData(null);
-                setBreadcrumbItems([
-                  {
-                    label: 'Playlists',
-                    onClick: () => {
-                      setPlaylistData(null);
-                      setShowRightPanel(false);
-                    },
-                    isActive: false,
-                  },
-                ]);
+              onClick: async () => {
+                await fetchUserPlaylists();
               },
               isActive: false,
             },
@@ -551,18 +560,8 @@ export default function MoodPlaylistUI() {
       setBreadcrumbItems([
         {
           label: 'Playlists',
-          onClick: () => {
-            setPlaylistData(null);
-            setBreadcrumbItems([
-              {
-                label: 'Playlists',
-                onClick: () => {
-                  setPlaylistData(null);
-                  setShowRightPanel(false);
-                },
-                isActive: false,
-              },
-            ]);
+          onClick: async () => {
+            await fetchUserPlaylists();
           },
           isActive: false,
         },
@@ -576,17 +575,7 @@ export default function MoodPlaylistUI() {
       console.error('Error fetching playlist:', error);
       alert('Failed to load playlist. Please try again.');
       // Reset to playlist list view on error
-      setPlaylistData(null);
-      setBreadcrumbItems([
-        {
-          label: 'Playlists',
-          onClick: () => {
-            setPlaylistData(null);
-            setShowRightPanel(false);
-          },
-          isActive: false,
-        },
-      ]);
+      await fetchUserPlaylists();
     } finally {
       setPlaylistLoading(false);
     }
@@ -616,6 +605,8 @@ export default function MoodPlaylistUI() {
             acousticness: song.acousticness || 0,
             release_year: null,
           })),
+          identifier: 0,
+          playlist_analysis: '',
         },
         items: tempPlaylist,
       });
@@ -638,9 +629,8 @@ export default function MoodPlaylistUI() {
       setBreadcrumbItems([
         {
           label: 'Playlists',
-          onClick: () => {
-            setPlaylistData(null);
-            setShowRightPanel(false);
+          onClick: async () => {
+            await fetchUserPlaylists();
           },
           isActive: false,
         },
@@ -681,9 +671,8 @@ export default function MoodPlaylistUI() {
         setBreadcrumbItems([
           {
             label: 'Playlists',
-            onClick: () => {
-              setPlaylistData(null);
-              setShowRightPanel(false);
+            onClick: async () => {
+              await fetchUserPlaylists();
             },
             isActive: false,
           },
@@ -746,6 +735,17 @@ export default function MoodPlaylistUI() {
                         <ChatLoadingMesage />
                       ) : msg.type === 'error' ? (
                         <ChatAIMessage content={msg.content} />
+                      ) : msg.type === 'action' &&
+                        msg.action === 'load-more' ? (
+                        <button
+                          onClick={handleLoadMoreSongs}
+                          className="w-full py-2 px-4 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors mt-4 flex items-center justify-center gap-2"
+                        >
+                          <span>Load More</span>
+                          <span className="text-sm text-gray-400">
+                            ({shownSongCount} of {allSuggestedSongs.length})
+                          </span>
+                        </button>
                       ) : null}
                     </div>
                   ))}
@@ -784,6 +784,17 @@ export default function MoodPlaylistUI() {
                         <ChatLoadingMesage />
                       ) : msg.type === 'error' ? (
                         <ChatAIMessage content={msg.content} />
+                      ) : msg.type === 'action' &&
+                        msg.action === 'load-more' ? (
+                        <button
+                          onClick={handleLoadMoreSongs}
+                          className="w-full py-2 px-4 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors mt-4 flex items-center justify-center gap-2"
+                        >
+                          <span>Load More</span>
+                          <span className="text-sm text-gray-400">
+                            ({shownSongCount} of {allSuggestedSongs.length})
+                          </span>
+                        </button>
                       ) : null}
                     </div>
                   ))}
@@ -835,6 +846,8 @@ export default function MoodPlaylistUI() {
                               playlist: {
                                 ...playlist,
                                 user_id: user?.id || '',
+                                identifier: 0,
+                                playlist_analysis: '',
                               },
                               items: playlist.playlist_items.map((item) => ({
                                 song_id: item.id,

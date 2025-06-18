@@ -22,9 +22,10 @@ export interface SongItem {
 
 export interface ConversationItem {
   id?: string;
-  type: 'user' | 'ai' | 'loading' | 'song' | 'error';
+  type: 'user' | 'ai' | 'loading' | 'song' | 'error' | 'action';
   content: string;
   song?: SongItem;
+  action?: string;
 }
 
 export interface ApiResponse {
